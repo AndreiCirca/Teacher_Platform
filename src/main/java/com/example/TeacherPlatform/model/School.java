@@ -1,33 +1,30 @@
 package com.example.TeacherPlatform.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "schools")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class School extends BaseEntity {
-    
+
     @Column(nullable = false)
     private String name;
-    
+
     @Column(nullable = false)
     private String county;
-    
-    @Column(unique = true)
-    private String cui;
-    
+
+    @Column(name = "tax_id", unique = true)
+    private String taxId;
+
     private String address;
-    
+
     private String directorEmail;
-    
+
     @Column(nullable = false)
     private Integer teacherCount = 0;
 }
-

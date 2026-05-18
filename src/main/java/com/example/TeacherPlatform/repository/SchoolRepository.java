@@ -11,8 +11,8 @@ import java.util.Optional;
 public interface SchoolRepository extends BaseRepository<School> {
     
     Optional<School> findByName(String name);
-    
-    Optional<School> findByCui(String cui);
+
+    Optional<School> findByTaxId(String taxId);
     
     List<School> findByCounty(String county);
     
