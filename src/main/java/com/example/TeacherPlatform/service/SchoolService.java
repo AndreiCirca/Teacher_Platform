@@ -33,7 +33,6 @@ public class SchoolService extends GenericService<School, SchoolRequest, SchoolR
         return school;
     }
 
-    // Entity → Response
     @Override
     protected SchoolResponse toResponse(School school) {
         SchoolResponse response = new SchoolResponse();
@@ -49,7 +48,6 @@ public class SchoolService extends GenericService<School, SchoolRequest, SchoolR
         return response;
     }
 
-    // Update existing fields
     @Override
     protected void updateEntity(School school, SchoolRequest request) {
         school.setName(request.getName());

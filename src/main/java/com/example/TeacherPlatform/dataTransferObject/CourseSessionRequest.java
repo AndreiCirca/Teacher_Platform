@@ -1,0 +1,28 @@
+package com.example.TeacherPlatform.dataTransferObject;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+public class CourseSessionRequest {
+    @NotNull(message = "Course ID is required")
+    private Long courseId;
+
+    @NotBlank(message = "Session topic is required")
+    private String topic;
+
+    @NotNull(message = "Start time is required")
+    private LocalDateTime startTime;
+
+    @NotNull(message = "End time is required")
+    private LocalDateTime endTime;
+
+    private String meetingLink;
+
+    @NotNull(message = "Session number is required")
+    private Integer sessionNumber;
+
+    private Boolean attendanceMarked = false;
+}
