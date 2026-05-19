@@ -7,6 +7,7 @@ import lombok.Data;
 
 @Data
 public class NotificationRequest {
+
     @NotNull(message = "User ID is required")
     private Long userId;
 
@@ -16,9 +17,8 @@ public class NotificationRequest {
     @NotBlank(message = "Message is required")
     private String message;
 
-    private NotificationType type = NotificationType.INFO;
-
-    private Boolean read = false;
+    @NotNull(message = "Notification type is required")
+    private NotificationType type;
 
     private String actionUrl;
 }
