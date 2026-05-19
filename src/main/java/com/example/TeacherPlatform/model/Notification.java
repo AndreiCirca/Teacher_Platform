@@ -2,17 +2,14 @@ package com.example.TeacherPlatform.model;
 
 import com.example.TeacherPlatform.model.enums.NotificationType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "notifications")
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 public class Notification extends BaseEntity {
     
     @ManyToOne(fetch = FetchType.LAZY)

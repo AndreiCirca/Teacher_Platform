@@ -1,17 +1,14 @@
 package com.example.TeacherPlatform.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "course_categories")
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 public class CourseCategory extends BaseEntity {
     
     @Column(nullable = false, unique = true)

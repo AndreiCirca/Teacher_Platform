@@ -1,18 +1,16 @@
 package com.example.TeacherPlatform.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "course_sessions")
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 public class CourseSession extends BaseEntity {
     
     @ManyToOne(fetch = FetchType.LAZY)

@@ -2,18 +2,16 @@ package com.example.TeacherPlatform.model;
 
 import com.example.TeacherPlatform.model.enums.CourseStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
+
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "courses")
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 public class Course extends BaseEntity {
     
     @Column(nullable = false)

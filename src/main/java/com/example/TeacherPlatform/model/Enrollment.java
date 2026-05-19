@@ -2,17 +2,14 @@ package com.example.TeacherPlatform.model;
 
 import com.example.TeacherPlatform.model.enums.EnrollmentStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "enrollments", uniqueConstraints = @UniqueConstraint(columnNames = {"course_id", "teacher_id"}))
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 public class Enrollment extends BaseEntity {
     
     @ManyToOne(fetch = FetchType.LAZY)
