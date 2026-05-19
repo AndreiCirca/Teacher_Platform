@@ -24,6 +24,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
+    private final SchoolService schoolService;
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -45,6 +46,9 @@ public class AuthService {
         }
 
         userRepository.save(user);
+        if (user.getRole() == UserRole.PROFESOR && user.getSchool() != null) {
+            schoolService.incrementTeacherCount(user.getSchool().getId());
+        }
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
         return new AuthResponse(token, user.getEmail(),

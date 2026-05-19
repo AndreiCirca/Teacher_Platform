@@ -15,6 +15,8 @@ public interface SchoolRepository extends BaseRepository<School> {
     Optional<School> findByTaxId(String taxId);
     
     List<School> findByCounty(String county);
+
+    List<School> findByNameContainingIgnoreCase(String name);
     
     @Query("SELECT s FROM School s ORDER BY s.teacherCount DESC")
     List<School> findByMostTeachers();
