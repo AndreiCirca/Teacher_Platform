@@ -2,6 +2,7 @@ package com.example.TeacherPlatform.dataTransferObject;
 
 import com.example.TeacherPlatform.model.enums.CourseStatus;
 import lombok.Data;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -13,7 +14,8 @@ public class CourseResponse {
     private Long categoryId;
     private String categoryName;
     private Long trainerId;
-    private String trainerFullName;
+    private String trainerFirstName;
+    private String trainerLastName;
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer creditHours;
@@ -28,3 +30,4 @@ public class CourseResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
+

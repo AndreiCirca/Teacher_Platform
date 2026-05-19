@@ -3,23 +3,22 @@ package com.example.TeacherPlatform.service;
 import com.example.TeacherPlatform.dataTransferObject.AttendanceRequest;
 import com.example.TeacherPlatform.dataTransferObject.AttendanceResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
-import com.example.TeacherPlatform.model.Attendance;
-import com.example.TeacherPlatform.model.CourseSession;
-import com.example.TeacherPlatform.model.Enrollment;
-import com.example.TeacherPlatform.repository.AttendanceRepository;
-import com.example.TeacherPlatform.repository.BaseRepository;
-import com.example.TeacherPlatform.repository.CourseSessionRepository;
-import com.example.TeacherPlatform.repository.EnrollmentRepository;
+import com.example.TeacherPlatform.model.*;
+import com.example.TeacherPlatform.repository.*;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.TeacherPlatform.model.enums.AttendanceStatus;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AttendanceService extends GenericService<Attendance, AttendanceRequest, AttendanceResponse> {
 
     private final AttendanceRepository attendanceRepository;
-    private final CourseSessionRepository sessionRepository;
+    private final CourseSessionRepository courseSessionRepository;
     private final EnrollmentRepository enrollmentRepository;
 
     @Override
@@ -29,8 +28,16 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
 
     @Override
     protected Attendance toEntity(AttendanceRequest request) {
+        CourseSession session = courseSessionRepository.findById(request.getSessionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + request.getSessionId()));
+
+        Enrollment enrollment = enrollmentRepository.findById(request.getEnrollmentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found with id: " + request.getEnrollmentId()));
+
         Attendance attendance = new Attendance();
-        mapFields(attendance, request);
+        attendance.setSession(session);
+        attendance.setEnrollment(enrollment);
+        attendance.setStatus(request.getStatus() != null ? request.getStatus() : AttendanceStatus.NOT_MARKED);
         return attendance;
     }
 
@@ -38,17 +45,13 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
     protected AttendanceResponse toResponse(Attendance entity) {
         AttendanceResponse response = new AttendanceResponse();
         response.setId(entity.getId());
-
-        if (entity.getSession() != null) {
-            response.setSessionId(entity.getSession().getId());
-            response.setSessionTopic(entity.getSession().getTopic());
-        }
-
-        if (entity.getEnrollment() != null && entity.getEnrollment().getTeacher() != null) {
-            response.setEnrollmentId(entity.getEnrollment().getId());
-            response.setTeacherFullName(entity.getEnrollment().getTeacher().getFullName());
-        }
-
+        response.setSessionId(entity.getSession().getId());
+        response.setSessionNumber(entity.getSession().getSessionNumber());
+        response.setSessionTopic(entity.getSession().getTopic());
+        response.setEnrollmentId(entity.getEnrollment().getId());
+        response.setTeacherId(entity.getEnrollment().getTeacher().getId());
+        response.setTeacherFirstName(entity.getEnrollment().getTeacher().getFirstName());
+        response.setTeacherLastName(entity.getEnrollment().getTeacher().getLastName());
         response.setStatus(entity.getStatus());
         response.setCreatedAt(entity.getCreatedAt());
         response.setUpdatedAt(entity.getUpdatedAt());
@@ -57,18 +60,35 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
 
     @Override
     protected void updateEntity(Attendance entity, AttendanceRequest request) {
-        mapFields(entity, request);
-    }
-
-    private void mapFields(Attendance entity, AttendanceRequest request) {
         entity.setStatus(request.getStatus());
 
-        CourseSession session = sessionRepository.findById(request.getSessionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Course session not found with id: " + request.getSessionId()));
-        entity.setSession(session);
+        // Mark attendanceMarked on session when attendance is recorded
+        if (request.getStatus() != AttendanceStatus.NOT_MARKED) {
+            CourseSession session = entity.getSession();
+            session.setAttendanceMarked(true);
+            courseSessionRepository.save(session);
+        }
+    }
 
-        Enrollment enrollment = enrollmentRepository.findById(request.getEnrollmentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found with id: " + request.getEnrollmentId()));
-        entity.setEnrollment(enrollment);
+    @Transactional(readOnly = true)
+    public List<AttendanceResponse> findBySessionId(Long sessionId) {
+        return attendanceRepository.findBySessionId(sessionId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttendanceResponse> findByEnrollmentId(Long enrollmentId) {
+        return attendanceRepository.findAttendanceByEnrollmentOrdered(enrollmentId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Long countPresentSessions(Long enrollmentId) {
+        return attendanceRepository.countPresentSessionsByEnrollment(enrollmentId);
+    }
+
+    @Transactional(readOnly = true)
+    public Long countPresentTeachersInSession(Long sessionId) {
+        return attendanceRepository.countPresentTeachersInSession(sessionId);
     }
 }

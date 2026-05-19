@@ -3,23 +3,24 @@ package com.example.TeacherPlatform.service;
 import com.example.TeacherPlatform.dataTransferObject.CourseRequest;
 import com.example.TeacherPlatform.dataTransferObject.CourseResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
-import com.example.TeacherPlatform.model.Course;
-import com.example.TeacherPlatform.model.CourseCategory;
-import com.example.TeacherPlatform.model.User;
-import com.example.TeacherPlatform.repository.BaseRepository;
-import com.example.TeacherPlatform.repository.CourseCategoryRepository;
-import com.example.TeacherPlatform.repository.CourseRepository;
-import com.example.TeacherPlatform.repository.UserRepository;
+import com.example.TeacherPlatform.model.*;
+import com.example.TeacherPlatform.model.enums.CourseStatus;
+import com.example.TeacherPlatform.repository.*;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.TeacherPlatform.model.enums.UserRole;
+
+import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class CourseService extends GenericService<Course, CourseRequest, CourseResponse> {
 
     private final CourseRepository courseRepository;
-    private final CourseCategoryRepository categoryRepository;
+    private final CourseCategoryRepository courseCategoryRepository;
     private final UserRepository userRepository;
 
     @Override
@@ -29,10 +30,44 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
 
     @Override
     protected Course toEntity(CourseRequest request) {
+        CourseCategory category = courseCategoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+
+        User trainer = userRepository.findById(request.getTrainerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Trainer not found with id: " + request.getTrainerId()));
+
+        if (trainer.getRole() != UserRole.FORMATOR) {
+            throw new RuntimeException("User with id " + request.getTrainerId() + " is not a FORMATOR");
+        }
+
+        if (request.getEndDate().isBefore(request.getStartDate())) {
+            throw new RuntimeException("End date must be after start date");
+        }
+
+        if (Boolean.TRUE.equals(request.getIsOnline()) && (request.getMeetingLink() == null || request.getMeetingLink().isBlank())) {
+            throw new RuntimeException("Meeting link is required for online courses");
+        }
+
+        if (Boolean.FALSE.equals(request.getIsOnline()) && (request.getLocation() == null || request.getLocation().isBlank())) {
+            throw new RuntimeException("Location is required for in-person courses");
+        }
+
         Course course = new Course();
-        mapFields(course, request);
+        course.setTitle(request.getTitle());
+        course.setDescription(request.getDescription());
+        course.setCategory(category);
+        course.setTrainer(trainer);
+        course.setStartDate(request.getStartDate());
+        course.setEndDate(request.getEndDate());
+        course.setCreditHours(request.getCreditHours());
+        course.setMaxParticipants(request.getMaxParticipants());
         course.setCurrentEnrolled(0);
-        course.setSessionCount(1); // Default initial configuration
+        course.setSessionCount(0);
+        course.setIsOnline(request.getIsOnline());
+        course.setLocation(request.getLocation());
+        course.setMeetingLink(request.getMeetingLink());
+        course.setStatus(request.getStatus() != null ? request.getStatus() : CourseStatus.DRAFT);
+        course.setThumbnailUrl(request.getThumbnailUrl());
         return course;
     }
 
@@ -42,17 +77,11 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
         response.setId(entity.getId());
         response.setTitle(entity.getTitle());
         response.setDescription(entity.getDescription());
-
-        if (entity.getCategory() != null) {
-            response.setCategoryId(entity.getCategory().getId());
-            response.setCategoryName(entity.getCategory().getName());
-        }
-
-        if (entity.getTrainer() != null) {
-            response.setTrainerId(entity.getTrainer().getId());
-            response.setTrainerFullName(entity.getTrainer().getFullName());
-        }
-
+        response.setCategoryId(entity.getCategory().getId());
+        response.setCategoryName(entity.getCategory().getName());
+        response.setTrainerId(entity.getTrainer().getId());
+        response.setTrainerFirstName(entity.getTrainer().getFirstName());
+        response.setTrainerLastName(entity.getTrainer().getLastName());
         response.setStartDate(entity.getStartDate());
         response.setEndDate(entity.getEndDate());
         response.setCreditHours(entity.getCreditHours());
@@ -71,12 +100,20 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
 
     @Override
     protected void updateEntity(Course entity, CourseRequest request) {
-        mapFields(entity, request);
-    }
+        if (entity.getStatus() == CourseStatus.COMPLETED || entity.getStatus() == CourseStatus.CANCELLED) {
+            throw new RuntimeException("Cannot edit a COMPLETED or CANCELLED course");
+        }
 
-    private void mapFields(Course entity, CourseRequest request) {
+        if (request.getEndDate().isBefore(request.getStartDate())) {
+            throw new RuntimeException("End date must be after start date");
+        }
+
+        CourseCategory category = courseCategoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+
         entity.setTitle(request.getTitle());
         entity.setDescription(request.getDescription());
+        entity.setCategory(category);
         entity.setStartDate(request.getStartDate());
         entity.setEndDate(request.getEndDate());
         entity.setCreditHours(request.getCreditHours());
@@ -84,15 +121,45 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
         entity.setIsOnline(request.getIsOnline());
         entity.setLocation(request.getLocation());
         entity.setMeetingLink(request.getMeetingLink());
-        entity.setStatus(request.getStatus());
         entity.setThumbnailUrl(request.getThumbnailUrl());
+    }
 
-        CourseCategory category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
-        entity.setCategory(category);
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findByStatus(CourseStatus status) {
+        return courseRepository.findByStatus(status).stream().map(this::toResponse).toList();
+    }
 
-        User trainer = userRepository.findById(request.getTrainerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Trainer not found with id: " + request.getTrainerId()));
-        entity.setTrainer(trainer);
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findByTrainerId(Long trainerId) {
+        return courseRepository.findByTrainerId(trainerId).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findByCategoryId(Long categoryId) {
+        return courseRepository.findByCategoryId(categoryId).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findAvailableCourses() {
+        return courseRepository.findAvailableCourses().stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findUpcomingCourses() {
+        return courseRepository.findUpcomingCourses(LocalDate.now()).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findPendingApprovalCourses() {
+        return courseRepository.findPendingApprovalCourses().stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public CourseResponse updateStatus(Long id, CourseStatus newStatus) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
+        course.setStatus(newStatus);
+        return toResponse(courseRepository.save(course));
     }
 }
+

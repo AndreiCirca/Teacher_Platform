@@ -11,6 +11,10 @@ import com.example.TeacherPlatform.repository.CourseSessionRepository;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +30,17 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
 
     @Override
     protected CourseSession toEntity(CourseSessionRequest request) {
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + request.getCourseId()));
+
         CourseSession session = new CourseSession();
-        mapFields(session, request);
+        session.setCourse(course);
+        session.setTopic(request.getTopic());
+        session.setStartTime(request.getStartTime());
+        session.setEndTime(request.getEndTime());
+        session.setMeetingLink(request.getMeetingLink());
+        session.setSessionNumber(request.getSessionNumber());
+        session.setAttendanceMarked(false);
         return session;
     }
 
@@ -35,12 +48,8 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
     protected CourseSessionResponse toResponse(CourseSession entity) {
         CourseSessionResponse response = new CourseSessionResponse();
         response.setId(entity.getId());
-
-        if (entity.getCourse() != null) {
-            response.setCourseId(entity.getCourse().getId());
-            response.setCourseTitle(entity.getCourse().getTitle());
-        }
-
+        response.setCourseId(entity.getCourse().getId());
+        response.setCourseTitle(entity.getCourse().getTitle());
         response.setTopic(entity.getTopic());
         response.setStartTime(entity.getStartTime());
         response.setEndTime(entity.getEndTime());
@@ -54,19 +63,34 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
 
     @Override
     protected void updateEntity(CourseSession entity, CourseSessionRequest request) {
-        mapFields(entity, request);
-    }
-
-    private void mapFields(CourseSession entity, CourseSessionRequest request) {
         entity.setTopic(request.getTopic());
         entity.setStartTime(request.getStartTime());
         entity.setEndTime(request.getEndTime());
         entity.setMeetingLink(request.getMeetingLink());
         entity.setSessionNumber(request.getSessionNumber());
-        entity.setAttendanceMarked(request.getAttendanceMarked());
+    }
 
-        Course course = courseRepository.findById(request.getCourseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + request.getCourseId()));
-        entity.setCourse(course);
+    @Transactional(readOnly = true)
+    public List<CourseSessionResponse> findByCourseId(Long courseId) {
+        return courseSessionRepository.findCourseSessionsOrdered(courseId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseSessionResponse> findSessionsByTimeRange(LocalDateTime from, LocalDateTime to) {
+        return courseSessionRepository.findSessionsByTimeRange(from, to)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseSessionResponse> findUnmarkedAttendanceSessions() {
+        return courseSessionRepository.findUnmarkedAttendanceSessions()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 }
