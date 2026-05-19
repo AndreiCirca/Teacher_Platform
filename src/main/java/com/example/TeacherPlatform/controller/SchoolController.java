@@ -8,7 +8,6 @@ import com.example.TeacherPlatform.service.SchoolService;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,33 +26,36 @@ public class SchoolController extends GenericController<School, SchoolRequest, S
         return schoolService;
     }
 
-
+    // GET /api/schools/county/{county} — Deschis pentru toți utilizatorii autentificați
     @GetMapping("/county/{county}")
+    @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
     public ResponseEntity<List<SchoolResponse>> getByCounty(@PathVariable String county) {
         return ResponseEntity.ok(schoolService.findByCounty(county));
     }
 
+    // GET /api/schools/search — Deschis pentru căutare rapidă în formularele de înregistrare/profil
     @GetMapping("/search")
+    @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
     public ResponseEntity<List<SchoolResponse>> search(@RequestParam String name) {
         return ResponseEntity.ok(schoolService.searchByName(name));
     }
 
-
     @Override
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN')")
     public ResponseEntity<SchoolResponse> create(@Valid @RequestBody SchoolRequest request) {
         return super.create(request);
     }
 
     @Override
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<SchoolResponse> update(@PathVariable Long id,
-                                                 @Valid @RequestBody SchoolRequest request) {
+    @PreAuthorize("hasAnyAuthority('ADMIN')")
+    public ResponseEntity<SchoolResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody SchoolRequest request) {
         return super.update(id, request);
     }
 
     @Override
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         return super.delete(id);
     }

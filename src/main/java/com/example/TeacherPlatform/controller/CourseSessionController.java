@@ -6,10 +6,12 @@ import com.example.TeacherPlatform.dataTransferObject.CourseSessionResponse;
 import com.example.TeacherPlatform.model.CourseSession;
 import com.example.TeacherPlatform.service.CourseSessionService;
 import com.example.TeacherPlatform.service.generic.GenericService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -27,15 +29,18 @@ public class CourseSessionController extends GenericController<CourseSession, Co
         return courseSessionService;
     }
 
-    // GET /api/sessions/course/{courseId} — sesiunile unui curs (toți autentificați)
+    // GET /api/sessions/course/{courseId} — Sesiunile unui curs (Verifică înscrierea dinamic dacă e PROFESOR)
     @GetMapping("/course/{courseId}")
-    public ResponseEntity<List<CourseSessionResponse>> getByCourse(@PathVariable Long courseId) {
-        return ResponseEntity.ok(courseSessionService.findByCourseId(courseId));
+    @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
+    public ResponseEntity<List<CourseSessionResponse>> getByCourse(
+            @PathVariable Long courseId,
+            Authentication authentication) {
+        return ResponseEntity.ok(courseSessionService.findByCourseId(courseId, authentication));
     }
 
     // GET /api/sessions/time-range?from=...&to=... (ADMIN, FORMATOR)
     @GetMapping("/time-range")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<List<CourseSessionResponse>> getByTimeRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
@@ -44,30 +49,28 @@ public class CourseSessionController extends GenericController<CourseSession, Co
 
     // GET /api/sessions/unmarked-attendance (ADMIN, FORMATOR)
     @GetMapping("/unmarked-attendance")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<List<CourseSessionResponse>> getUnmarkedAttendance() {
         return ResponseEntity.ok(courseSessionService.findUnmarkedAttendanceSessions());
     }
 
     @Override
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
-    public ResponseEntity<CourseSessionResponse> create(
-            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody CourseSessionRequest request) {
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
+    public ResponseEntity<CourseSessionResponse> create(@Valid @RequestBody CourseSessionRequest request) {
         return super.create(request);
     }
 
     @Override
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<CourseSessionResponse> update(
             @PathVariable Long id,
-            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody CourseSessionRequest request) {
+            @Valid @RequestBody CourseSessionRequest request) {
         return super.update(id, request);
     }
 
     @Override
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         return super.delete(id);
     }
 }
- 

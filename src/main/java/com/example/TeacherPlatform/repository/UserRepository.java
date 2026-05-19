@@ -18,6 +18,7 @@ public interface UserRepository extends BaseRepository<User> {
     List<User> findBySchoolId(Long schoolId);
     
     List<User> findByRoleAndActive(UserRole role, Boolean active);
+    long countBySchoolIdAndActiveTrue(Long schoolId);
     
     @Query("SELECT COUNT(u) FROM User u WHERE u.role = ?1")
     Long countByRole(UserRole role);

@@ -7,9 +7,12 @@ import com.example.TeacherPlatform.model.Course;
 import com.example.TeacherPlatform.model.CourseMaterial;
 import com.example.TeacherPlatform.repository.BaseRepository;
 import com.example.TeacherPlatform.repository.CourseMaterialRepository;
-import com.example.TeacherPlatform.repository.CourseRepository; // presupunând că există
+import com.example.TeacherPlatform.repository.CourseRepository;
+import com.example.TeacherPlatform.repository.EnrollmentRepository;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +24,7 @@ public class CourseMaterialService extends GenericService<CourseMaterial, Course
 
     private final CourseMaterialRepository courseMaterialRepository;
     private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Override
     protected BaseRepository<CourseMaterial> getRepository() {
@@ -47,8 +51,12 @@ public class CourseMaterialService extends GenericService<CourseMaterial, Course
     protected CourseMaterialResponse toResponse(CourseMaterial entity) {
         CourseMaterialResponse response = new CourseMaterialResponse();
         response.setId(entity.getId());
-        response.setCourseId(entity.getCourse().getId());
-        response.setCourseTitle(entity.getCourse().getTitle()); // mapare titlu din relația ManyToOne
+
+        if (entity.getCourse() != null) {
+            response.setCourseId(entity.getCourse().getId());
+            response.setCourseTitle(entity.getCourse().getTitle());
+        }
+
         response.setFileName(entity.getFileName());
         response.setFileType(entity.getFileType());
         response.setFileSize(entity.getFileSize());
@@ -70,10 +78,24 @@ public class CourseMaterialService extends GenericService<CourseMaterial, Course
     }
 
     @Transactional(readOnly = true)
-    public List<CourseMaterialResponse> findByCourseId(Long courseId) {
+    public List<CourseMaterialResponse> findByCourseId(Long courseId, Authentication authentication) {
         if (!courseRepository.existsById(courseId)) {
             throw new ResourceNotFoundException("Course not found with id: " + courseId);
         }
+
+        String username = authentication.getName();
+        boolean isTeacher = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(auth -> "PROFESOR".equals(auth));
+
+        // Securitate dinamică direct din baza de date bazată pe user-ul logat prin JWT
+        if (isTeacher) {
+            boolean hasAccess = enrollmentRepository.hasConfirmedOrCompletedEnrollment(courseId, username);
+            if (!hasAccess) {
+                throw new RuntimeException("Access denied. You must have a confirmed enrollment to view materials.");
+            }
+        }
+
         return courseMaterialRepository.findCourseMaterialsOrdered(courseId)
                 .stream()
                 .map(this::toResponse)
@@ -81,9 +103,22 @@ public class CourseMaterialService extends GenericService<CourseMaterial, Course
     }
 
     @Transactional
-    public CourseMaterialResponse incrementDownloadCount(Long id) {
+    public CourseMaterialResponse incrementDownloadCount(Long id, Authentication authentication) {
         CourseMaterial material = courseMaterialRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found with id: " + id));
+
+        String username = authentication.getName();
+        boolean isTeacher = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(auth -> "PROFESOR".equals(auth));
+
+        if (isTeacher && material.getCourse() != null) {
+            boolean hasAccess = enrollmentRepository.hasConfirmedOrCompletedEnrollment(material.getCourse().getId(), username);
+            if (!hasAccess) {
+                throw new RuntimeException("Access denied. You cannot download materials from this course.");
+            }
+        }
+
         material.setDownloadCount(material.getDownloadCount() + 1);
         return toResponse(courseMaterialRepository.save(material));
     }

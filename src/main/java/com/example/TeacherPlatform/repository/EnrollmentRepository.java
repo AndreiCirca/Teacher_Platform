@@ -11,33 +11,44 @@ import java.util.Optional;
 
 @Repository
 public interface EnrollmentRepository extends BaseRepository<Enrollment> {
-    
+
+    // Presupunând că în modelul Enrollment relația se numește 'teacher' (dacă se numește 'user', schimbă în 'user')
     List<Enrollment> findByTeacherId(Long teacherId);
-    
+
     List<Enrollment> findByCourseId(Long courseId);
-    
+
     List<Enrollment> findByStatus(EnrollmentStatus status);
-    
+
     Optional<Enrollment> findByCourseIdAndTeacherId(Long courseId, Long teacherId);
-    
-    @Query("SELECT e FROM Enrollment e WHERE e.teacher.id = :teacherId AND e.status = 'CONFIRMED' ORDER BY e.course.startDate ASC")
+
+    // CORECTAT: Query JPQL curat care verifică stările folosind direct constantele de Enum trimise ca parametri sau mapate standard
+    @Query("SELECT COUNT(e) > 0 FROM Enrollment e WHERE e.course.id = :courseId " +
+            "AND e.teacher.email = :username " +
+            "AND (e.status = com.example.TeacherPlatform.model.enums.EnrollmentStatus.CONFIRMED " +
+            "OR e.status = com.example.TeacherPlatform.model.enums.EnrollmentStatus.COMPLETED)")
+    boolean hasConfirmedOrCompletedEnrollment(@Param("courseId") Long courseId, @Param("username") String username);
+
+    // CORECTAT: Am înlocuit stringul rigid 'CONFIRMED' cu referința completă a Enum-ului pentru a evita erorile de tip la rulare
+    @Query("SELECT e FROM Enrollment e WHERE e.teacher.id = :teacherId " +
+            "AND e.status = com.example.TeacherPlatform.model.enums.EnrollmentStatus.CONFIRMED " +
+            "ORDER BY e.course.startDate ASC")
     List<Enrollment> findConfirmedEnrollmentsByTeacher(@Param("teacherId") Long teacherId);
-    
-    @Query("SELECT e FROM Enrollment e WHERE e.course.id = :courseId AND e.status = 'CONFIRMED'")
+
+    @Query("SELECT e FROM Enrollment e WHERE e.course.id = :courseId " +
+            "AND e.status = com.example.TeacherPlatform.model.enums.EnrollmentStatus.CONFIRMED")
     List<Enrollment> findConfirmedEnrollmentsByCourse(@Param("courseId") Long courseId);
-    
-    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId AND e.status = 'CONFIRMED'")
+
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId " +
+            "AND e.status = com.example.TeacherPlatform.model.enums.EnrollmentStatus.CONFIRMED")
     Long countConfirmedEnrollmentsByCourse(@Param("courseId") Long courseId);
-    
-    @Query("SELECT e FROM Enrollment e WHERE e.status = 'PENDING' ORDER BY e.createdAt ASC")
+
+    @Query("SELECT e FROM Enrollment e WHERE e.status = com.example.TeacherPlatform.model.enums.EnrollmentStatus.PENDING " +
+            "ORDER BY e.createdAt ASC")
     List<Enrollment> findPendingEnrollments();
-    
+
     @Query("SELECT e FROM Enrollment e WHERE e.teacher.id = :teacherId AND e.status = :status ORDER BY e.course.startDate DESC")
     List<Enrollment> findByTeacherAndStatus(@Param("teacherId") Long teacherId, @Param("status") EnrollmentStatus status);
-    
+
     @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId")
     Long countByCourseId(@Param("courseId") Long courseId);
 }
-
-
-

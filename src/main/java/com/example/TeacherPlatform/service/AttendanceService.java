@@ -4,12 +4,12 @@ import com.example.TeacherPlatform.dataTransferObject.AttendanceRequest;
 import com.example.TeacherPlatform.dataTransferObject.AttendanceResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
 import com.example.TeacherPlatform.model.*;
+import com.example.TeacherPlatform.model.enums.AttendanceStatus;
 import com.example.TeacherPlatform.repository.*;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.example.TeacherPlatform.model.enums.AttendanceStatus;
 
 import java.util.List;
 
@@ -62,7 +62,6 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
     protected void updateEntity(Attendance entity, AttendanceRequest request) {
         entity.setStatus(request.getStatus());
 
-        // Mark attendanceMarked on session when attendance is recorded
         if (request.getStatus() != AttendanceStatus.NOT_MARKED) {
             CourseSession session = entity.getSession();
             session.setAttendanceMarked(true);
@@ -90,5 +89,62 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
     @Transactional(readOnly = true)
     public Long countPresentTeachersInSession(Long sessionId) {
         return attendanceRepository.countPresentTeachersInSession(sessionId);
+    }
+
+    /**
+     * COREMANDE COREIATE: Salvare bulk a catalogului (POST /api/sessions/{id}/attendance/save)
+     */
+    @Transactional
+    public List<AttendanceResponse> saveBulkAttendance(Long sessionId, List<AttendanceRequest> requests) {
+        CourseSession session = courseSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+
+        List<Attendance> savedList = requests.stream().map(req -> {
+            Attendance attendance = attendanceRepository.findBySessionIdAndEnrollmentId(sessionId, req.getEnrollmentId())
+                    .orElseGet(() -> {
+                        Attendance newAttendance = new Attendance();
+                        newAttendance.setSession(session);
+                        newAttendance.setEnrollment(enrollmentRepository.findById(req.getEnrollmentId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found: " + req.getEnrollmentId())));
+                        return newAttendance;
+                    });
+            attendance.setStatus(req.getStatus());
+            return attendanceRepository.save(attendance);
+        }).toList();
+
+        session.setAttendanceMarked(true);
+        courseSessionRepository.save(session);
+
+        return savedList.stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * REZOLVARE EROARE image_75f549.png:
+     * Folosește funcția existentă din EnrollmentRepository: findConfirmedEnrollmentsByCourse
+     */
+    @Transactional
+    public List<AttendanceResponse> markAllPresent(Long sessionId) {
+        CourseSession session = courseSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+
+        // Corecție directă: apelăm metoda corectă din repository-ul tău!
+        List<Enrollment> enrollments = enrollmentRepository.findConfirmedEnrollmentsByCourse(session.getCourse().getId());
+
+        List<Attendance> attendances = enrollments.stream().map(enrollment -> {
+            Attendance attendance = attendanceRepository.findBySessionIdAndEnrollmentId(sessionId, enrollment.getId())
+                    .orElseGet(() -> {
+                        Attendance newAttendance = new Attendance();
+                        newAttendance.setSession(session);
+                        newAttendance.setEnrollment(enrollment);
+                        return newAttendance;
+                    });
+            attendance.setStatus(AttendanceStatus.PRESENT);
+            return attendanceRepository.save(attendance);
+        }).toList();
+
+        session.setAttendanceMarked(true);
+        courseSessionRepository.save(session);
+
+        return attendances.stream().map(this::toResponse).toList();
     }
 }

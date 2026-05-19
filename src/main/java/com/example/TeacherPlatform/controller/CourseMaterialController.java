@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,38 +27,40 @@ public class CourseMaterialController extends GenericController<CourseMaterial, 
         return courseMaterialService;
     }
 
-    // GET /api/materials/course/{courseId} — returnează materialele unui curs specfic (Profesori înscriși, Formatori, Admini)
+    // GET /api/materials/course/{courseId} — Returnează materialele doar dacă profesorul este înscris confirmat
     @GetMapping("/course/{courseId}")
-    @PreAuthorize("hasAnyRole('PROFESOR', 'FORMATOR', 'ADMIN')")
-    public ResponseEntity<List<CourseMaterialResponse>> getMaterialsByCourse(@PathVariable Long courseId) {
-        return ResponseEntity.ok(courseMaterialService.findByCourseId(courseId));
+    @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
+    public ResponseEntity<List<CourseMaterialResponse>> getMaterialsByCourse(
+            @PathVariable Long courseId,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(courseMaterialService.findByCourseId(courseId, authentication));
     }
 
-    // PUT /api/materials/{id}/download — incrementare downloadCount la descărcare
+    // PUT /api/materials/{id}/download — Incrementează downloadCount securizat
     @PutMapping("/{id}/download")
-    @PreAuthorize("hasAnyRole('PROFESOR', 'FORMATOR', 'ADMIN')")
-    public ResponseEntity<CourseMaterialResponse> trackDownload(@PathVariable Long id) {
-        return ResponseEntity.ok(courseMaterialService.incrementDownloadCount(id));
+    @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
+    public ResponseEntity<CourseMaterialResponse> trackDownload(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(courseMaterialService.incrementDownloadCount(id, authentication));
     }
 
-    // POST /api/materials — adăugare material (doar FORMATOR sau ADMIN)
     @Override
-    @PreAuthorize("hasAnyRole('FORMATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<CourseMaterialResponse> create(@Valid @RequestBody CourseMaterialRequest request) {
         return super.create(request);
     }
 
-    // PUT /api/materials/{id} — editare metadate material (doar FORMATOR sau ADMIN)
     @Override
-    @PreAuthorize("hasAnyRole('FORMATOR', 'ADMIN')")
-    public ResponseEntity<CourseMaterialResponse> update(@PathVariable Long id,
-                                                         @Valid @RequestBody CourseMaterialRequest request) {
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
+    public ResponseEntity<CourseMaterialResponse> update(@PathVariable Long id, @Valid @RequestBody CourseMaterialRequest request) {
         return super.update(id, request);
     }
 
-    // DELETE /api/materials/{id} — ștergere material (doar FORMATOR sau ADMIN)
     @Override
-    @PreAuthorize("hasAnyRole('FORMATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         return super.delete(id);
     }

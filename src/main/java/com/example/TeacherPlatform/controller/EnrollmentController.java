@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,96 +33,106 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
     // PROFESOR
     // -------------------------------------------------------------------------
 
-    @Override
-    @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<EnrollmentResponse> create(@Valid @RequestBody EnrollmentRequest request) {
+    /**
+     * Schimbat din @PostMapping simplu în @PostMapping("/secure") pentru a evita
+     * conflictul (Ambiguous mapping) cu metoda create() din GenericController.
+     */
+    @PostMapping("/secure")
+    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    public ResponseEntity<EnrollmentResponse> createEnrollment(
+            @Valid @RequestBody EnrollmentRequest request,
+            Authentication authentication) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(enrollmentService.create(request));
+                .body(enrollmentService.createEnrollment(request, authentication));
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<List<EnrollmentResponse>> getMyEnrollments() {
-        return ResponseEntity.ok(enrollmentService.getMyEnrollments());
+    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    public ResponseEntity<List<EnrollmentResponse>> getMyEnrollments(Authentication authentication) {
+        return ResponseEntity.ok(enrollmentService.getMyEnrollments(authentication));
     }
 
     @GetMapping("/my/active")
-    @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<List<EnrollmentResponse>> getMyActiveEnrollments() {
-        return ResponseEntity.ok(enrollmentService.getMyActiveEnrollments());
+    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    public ResponseEntity<List<EnrollmentResponse>> getMyActiveEnrollments(Authentication authentication) {
+        return ResponseEntity.ok(enrollmentService.getMyActiveEnrollments(authentication));
     }
 
     @GetMapping("/my/completed")
-    @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<List<EnrollmentResponse>> getMyCompletedEnrollments() {
-        return ResponseEntity.ok(enrollmentService.getMyCompletedEnrollments());
+    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    public ResponseEntity<List<EnrollmentResponse>> getMyCompletedEnrollments(Authentication authentication) {
+        return ResponseEntity.ok(enrollmentService.getMyCompletedEnrollments(authentication));
     }
 
     @GetMapping("/check/{courseId}")
-    @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<Map<String, Boolean>> checkEnrollment(@PathVariable Long courseId) {
+    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    public ResponseEntity<Map<String, Boolean>> checkEnrollment(
+            @PathVariable Long courseId,
+            Authentication authentication) {
         return ResponseEntity.ok(
-                Map.of("enrolled", enrollmentService.checkEnrollment(courseId))
+                Map.of("enrolled", enrollmentService.checkEnrollment(courseId, authentication))
         );
     }
 
-    /**
-     * Override metoda delete din GenericController
-     * pentru a evita Ambiguous mapping.
-     */
-    @Override
-    @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        enrollmentService.cancelEnrollment(id);
+    @PutMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    public ResponseEntity<Void> cancelEnrollment(@PathVariable Long id, Authentication authentication) {
+        enrollmentService.cancelEnrollment(id, authentication);
         return ResponseEntity.noContent().build();
     }
 
     // -------------------------------------------------------------------------
-    // FORMATOR
+    // FORMATOR / ADMIN
     // -------------------------------------------------------------------------
 
     @PutMapping("/{id}/confirm")
-    @PreAuthorize("hasRole('FORMATOR')")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<EnrollmentResponse> confirmEnrollment(@PathVariable Long id) {
-        return ResponseEntity.ok(
-                enrollmentService.confirmEnrollment(id)
-        );
+        return ResponseEntity.ok(enrollmentService.confirmEnrollment(id));
     }
 
     @PutMapping("/{id}/complete")
-    @PreAuthorize("hasAnyRole('FORMATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<EnrollmentResponse> completeEnrollment(@PathVariable Long id) {
-        return ResponseEntity.ok(
-                enrollmentService.completeEnrollment(id)
-        );
+        return ResponseEntity.ok(enrollmentService.completeEnrollment(id));
     }
 
     @GetMapping("/course/{courseId}")
-    @PreAuthorize("hasAnyRole('FORMATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<List<EnrollmentResponse>> getByCourse(@PathVariable Long courseId) {
-        return ResponseEntity.ok(
-                enrollmentService.getEnrollmentsByCourse(courseId)
-        );
+        return ResponseEntity.ok(enrollmentService.getEnrollmentsByCourse(courseId));
     }
 
     @GetMapping("/course/{courseId}/confirmed")
-    @PreAuthorize("hasAnyRole('FORMATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<List<EnrollmentResponse>> getConfirmedByCourse(@PathVariable Long courseId) {
-        return ResponseEntity.ok(
-                enrollmentService.getConfirmedEnrollmentsByCourse(courseId)
-        );
+        return ResponseEntity.ok(enrollmentService.getConfirmedEnrollmentsByCourse(courseId));
+    }
+
+    @GetMapping("/pending")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
+    public ResponseEntity<List<EnrollmentResponse>> getPendingEnrollments() {
+        return ResponseEntity.ok(enrollmentService.getPendingEnrollments());
     }
 
     // -------------------------------------------------------------------------
-    // ADMIN
+    // INVALIDĂRI METODE GENERICE (Previn conflictele de mapare Spring)
     // -------------------------------------------------------------------------
 
-    @GetMapping("/pending")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<EnrollmentResponse>> getPendingEnrollments() {
-        return ResponseEntity.ok(
-                enrollmentService.getPendingEnrollments()
-        );
+    @Override
+    public ResponseEntity<EnrollmentResponse> create(@Valid @RequestBody EnrollmentRequest request) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
+    }
+
+    @Override
+    public ResponseEntity<EnrollmentResponse> update(@PathVariable Long id, @Valid @RequestBody EnrollmentRequest request) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
+    }
+
+    @Override
+    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
     }
 }

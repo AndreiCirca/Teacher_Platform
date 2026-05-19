@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/attendance")
+@RequestMapping("/api/attendances")
 @RequiredArgsConstructor
 public class AttendanceController extends GenericController<Attendance, AttendanceRequest, AttendanceResponse> {
 
@@ -27,45 +27,63 @@ public class AttendanceController extends GenericController<Attendance, Attendan
     }
 
     // GET /api/attendance/session/{sessionId} (ADMIN, FORMATOR)
-    @GetMapping("/session/{sessionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @GetMapping("/attendance/session/{sessionId}")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<List<AttendanceResponse>> getBySession(@PathVariable Long sessionId) {
         return ResponseEntity.ok(attendanceService.findBySessionId(sessionId));
     }
 
-    // GET /api/attendance/enrollment/{enrollmentId}
-    @GetMapping("/enrollment/{enrollmentId}")
-    public ResponseEntity<List<AttendanceResponse>> getByEnrollment(@PathVariable Long enrollmentId) {
+    /**
+     * GĂURI SPECIFICAȚII - RUTA DE UI:
+     * GET /api/enrollments/{id}/attendance/pills
+     * Returnează matricea vizuală de prezență (cercul verde/roșu per sesiune) din contul prof.
+     */
+    @GetMapping("/enrollments/{enrollmentId}/attendance/pills")
+    @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
+    public ResponseEntity<List<AttendanceResponse>> getAttendancePills(@PathVariable Long enrollmentId) {
         return ResponseEntity.ok(attendanceService.findByEnrollmentId(enrollmentId));
     }
 
-    // GET /api/attendance/enrollment/{enrollmentId}/count-present
-    @GetMapping("/enrollment/{enrollmentId}/count-present")
+    // POST /api/sessions/{id}/attendance/save
+    @PostMapping("/sessions/{sessionId}/attendance/save")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
+    public ResponseEntity<List<AttendanceResponse>> saveBulk(@PathVariable Long sessionId, @Valid @RequestBody List<AttendanceRequest> requests) {
+        return ResponseEntity.ok(attendanceService.saveBulkAttendance(sessionId, requests));
+    }
+
+    // PUT /api/sessions/{id}/attendance/mark-all-present
+    @PutMapping("/sessions/{sessionId}/attendance/mark-all-present")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
+    public ResponseEntity<List<AttendanceResponse>> markAllPresent(@PathVariable Long sessionId) {
+        return ResponseEntity.ok(attendanceService.markAllPresent(sessionId));
+    }
+
+    @GetMapping("/attendance/enrollment/{enrollmentId}/count-present")
+    @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
     public ResponseEntity<Long> countPresent(@PathVariable Long enrollmentId) {
         return ResponseEntity.ok(attendanceService.countPresentSessions(enrollmentId));
     }
 
-    // GET /api/attendance/session/{sessionId}/count-present
-    @GetMapping("/session/{sessionId}/count-present")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @GetMapping("/attendance/session/{sessionId}/count-present")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<Long> countPresentInSession(@PathVariable Long sessionId) {
         return ResponseEntity.ok(attendanceService.countPresentTeachersInSession(sessionId));
     }
 
     @Override
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<AttendanceResponse> create(@Valid @RequestBody AttendanceRequest request) {
         return super.create(request);
     }
 
     @Override
-    @PreAuthorize("hasAnyRole('ADMIN', 'FORMATOR')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<AttendanceResponse> update(@PathVariable Long id, @Valid @RequestBody AttendanceRequest request) {
         return super.update(id, request);
     }
 
     @Override
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         return super.delete(id);
     }

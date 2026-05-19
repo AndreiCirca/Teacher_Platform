@@ -27,7 +27,7 @@ public class CourseCategoryService extends GenericService<CourseCategory, Course
     @Override
     protected CourseCategory toEntity(CourseCategoryRequest request) {
         CourseCategory category = new CourseCategory();
-        category.setName(request.getName());
+        category.setName(request.getName().trim());
         category.setDescription(request.getDescription());
         category.setColor(request.getColor());
         category.setActive(request.getActive() != null ? request.getActive() : true);
@@ -49,12 +49,35 @@ public class CourseCategoryService extends GenericService<CourseCategory, Course
 
     @Override
     protected void updateEntity(CourseCategory entity, CourseCategoryRequest request) {
-        entity.setName(request.getName());
+        entity.setName(request.getName().trim());
         entity.setDescription(request.getDescription());
         entity.setColor(request.getColor());
         if (request.getActive() != null) {
             entity.setActive(request.getActive());
         }
+    }
+
+    @Override
+    @Transactional
+    public CourseCategoryResponse create(CourseCategoryRequest request) {
+        // Validăm unicitatea numelui categoriei la adăugare
+        if (courseCategoryRepository.findByNameIgnoreCase(request.getName().trim()).isPresent()) {
+            throw new RuntimeException("A course category with this name already exists.");
+        }
+        return super.create(request);
+    }
+
+    @Override
+    @Transactional
+    public CourseCategoryResponse update(Long id, CourseCategoryRequest request) {
+        // Validăm unicitatea numelui la editare pentru a nu intra în conflict cu altă categorie existentă
+        courseCategoryRepository.findByNameIgnoreCase(request.getName().trim())
+                .ifPresent(existing -> {
+                    if (!existing.getId().equals(id)) {
+                        throw new RuntimeException("Another category with this name already exists.");
+                    }
+                });
+        return super.update(id, request);
     }
 
     @Transactional(readOnly = true)
@@ -76,11 +99,12 @@ public class CourseCategoryService extends GenericService<CourseCategory, Course
     @Override
     @Transactional
     public void delete(Long id) {
-        CourseCategory category = courseCategoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        if (!courseCategoryRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Category not found with id: " + id);
+        }
 
         if (courseCategoryRepository.hasCourses(id)) {
-            throw new RuntimeException("Cannot delete a category that has courses associated with it");
+            throw new RuntimeException("Cannot delete a category that has courses associated with it.");
         }
 
         super.delete(id);
