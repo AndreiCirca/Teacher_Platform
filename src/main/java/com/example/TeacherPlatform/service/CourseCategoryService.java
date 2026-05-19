@@ -2,12 +2,16 @@ package com.example.TeacherPlatform.service;
 
 import com.example.TeacherPlatform.dataTransferObject.CourseCategoryRequest;
 import com.example.TeacherPlatform.dataTransferObject.CourseCategoryResponse;
+import com.example.TeacherPlatform.exception.ResourceNotFoundException;
 import com.example.TeacherPlatform.model.CourseCategory;
 import com.example.TeacherPlatform.repository.BaseRepository;
 import com.example.TeacherPlatform.repository.CourseCategoryRepository;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +30,7 @@ public class CourseCategoryService extends GenericService<CourseCategory, Course
         category.setName(request.getName());
         category.setDescription(request.getDescription());
         category.setColor(request.getColor());
-        category.setActive(request.getActive());
+        category.setActive(request.getActive() != null ? request.getActive() : true);
         return category;
     }
 
@@ -48,6 +52,37 @@ public class CourseCategoryService extends GenericService<CourseCategory, Course
         entity.setName(request.getName());
         entity.setDescription(request.getDescription());
         entity.setColor(request.getColor());
-        entity.setActive(request.getActive());
+        if (request.getActive() != null) {
+            entity.setActive(request.getActive());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseCategoryResponse> findAllActive() {
+        return courseCategoryRepository.findByActiveTrue()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public CourseCategoryResponse toggleActive(Long id) {
+        CourseCategory category = courseCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        category.setActive(!category.getActive());
+        return toResponse(courseCategoryRepository.save(category));
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long id) {
+        CourseCategory category = courseCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+
+        if (courseCategoryRepository.hasCourses(id)) {
+            throw new RuntimeException("Cannot delete a category that has courses associated with it");
+        }
+
+        super.delete(id);
     }
 }

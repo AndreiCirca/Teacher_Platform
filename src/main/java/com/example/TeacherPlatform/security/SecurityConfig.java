@@ -40,6 +40,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/schools/**").hasRole("ADMIN")
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/courses/**").hasAnyRole("ADMIN", "FORMATOR")
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                        .requestMatchers("/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers("/api/notifications/my/**").authenticated()
+                        .requestMatchers("/api/notifications/**").hasAnyRole("ADMIN", "FORMATOR", "PROFESOR")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
