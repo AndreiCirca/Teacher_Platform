@@ -7,6 +7,7 @@ import com.example.TeacherPlatform.model.Course;
 import com.example.TeacherPlatform.model.CourseCategory;
 import com.example.TeacherPlatform.model.User;
 import com.example.TeacherPlatform.model.enums.CourseStatus;
+import com.example.TeacherPlatform.model.enums.NotificationType;
 import com.example.TeacherPlatform.model.enums.UserRole;
 import com.example.TeacherPlatform.repository.BaseRepository;
 import com.example.TeacherPlatform.repository.CourseCategoryRepository;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,7 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
     private final CourseRepository courseRepository;
     private final CourseCategoryRepository courseCategoryRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService; // Adăugat pentru notificări automate
 
     @Override
     protected BaseRepository<Course> getRepository() {
@@ -37,13 +40,13 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
     @Override
     protected Course toEntity(CourseRequest request) {
         CourseCategory category = courseCategoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
         User trainer = userRepository.findById(request.getTrainerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Trainer not found with id: " + request.getTrainerId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Trainer not found"));
 
         if (trainer.getRole() != UserRole.FORMATOR) {
-            throw new RuntimeException("User with id " + request.getTrainerId() + " is not a FORMATOR");
+            throw new RuntimeException("User must have the FORMATOR role.");
         }
 
         validateDates(request.getStartDate(), request.getEndDate());
@@ -53,7 +56,7 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
         mapFields(course, request, category);
         course.setTrainer(trainer);
         course.setCurrentEnrolled(0);
-        course.setSessionCount(0); // Sincronizat cu CourseSessionService
+        course.setSessionCount(0);
         course.setStatus(request.getStatus() != null ? request.getStatus() : CourseStatus.DRAFT);
         return course;
     }
@@ -96,28 +99,51 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
         if (entity.getStatus() == CourseStatus.COMPLETED || entity.getStatus() == CourseStatus.CANCELLED) {
             throw new RuntimeException("Cannot edit a COMPLETED or CANCELLED course.");
         }
-
         CourseCategory category = courseCategoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
         validateDates(request.getStartDate(), request.getEndDate());
         validateDeliveryFormat(request);
         mapFields(entity, request, category);
     }
 
-    @Transactional
-    public CourseResponse createCourseSecure(CourseRequest request, Authentication authentication) {
-        User currentUser = getUserByEmail(authentication.getName());
-        boolean isAdmin = authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ADMIN"));
-        User trainer = currentUser;
+    // ----------------------------------------------------------------------------------
+    // Funcționalități Publice & Profesor
+    // ----------------------------------------------------------------------------------
 
-        if (isAdmin) {
-            trainer = userRepository.findById(request.getTrainerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Trainer not found"));
-            if (trainer.getRole() != UserRole.FORMATOR) {
-                throw new RuntimeException("The selected trainer must have the FORMATOR role.");
-            }
-        }
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findAvailableCourses() {
+        return courseRepository.findAvailableCourses().stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findUpcomingCourses() {
+        return courseRepository.findUpcomingCourses(LocalDate.now()).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findPopularCourses() {
+        // Returnează top 6 cursuri ordonate după currentEnrolled (logica se poate adăuga în repository sau aici)
+        return courseRepository.findByStatus(CourseStatus.ACTIVE)
+                .stream()
+                .sorted((c1, c2) -> Integer.compare(c2.getCurrentEnrolled(), c1.getCurrentEnrolled()))
+                .limit(6)
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findByCategoryId(Long categoryId) {
+        return courseRepository.findByCategoryId(categoryId).stream().map(this::toResponse).toList();
+    }
+
+    // ----------------------------------------------------------------------------------
+    // Funcționalități FORMATOR
+    // ----------------------------------------------------------------------------------
+
+    @Transactional
+    public CourseResponse proposeCourse(CourseRequest request, Authentication authentication) {
+        User trainer = getUserByEmail(authentication.getName());
 
         CourseCategory category = courseCategoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
@@ -129,39 +155,36 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
         mapFields(course, request, category);
         course.setTrainer(trainer);
         course.setCurrentEnrolled(0);
-        course.setSessionCount(0); // Sincronizat cu CourseSessionService
-        course.setStatus(isAdmin ? request.getStatus() : CourseStatus.DRAFT);
+        course.setSessionCount(0);
+        // Formatorul trimite automat cursul spre aprobare
+        course.setStatus(CourseStatus.PENDING_APPROVAL);
 
-        return toResponse(courseRepository.save(course));
+        Course savedCourse = courseRepository.save(course);
+
+        // Notificăm adminii (presupunând că găsim adminii, aici poți extinde logica)
+        // notificationService.sendNotificationToAdmins(...)
+
+        return toResponse(savedCourse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> findMyCoursesAsTrainer(Authentication authentication) {
+        User trainer = getUserByEmail(authentication.getName());
+        return courseRepository.findByTrainerId(trainer.getId()).stream().map(this::toResponse).toList();
     }
 
     @Transactional
-    public CourseResponse updateCourseSecure(Long id, CourseRequest request, Authentication authentication) {
+    public CourseResponse updateCourseAsTrainer(Long id, CourseRequest request, Authentication authentication) {
         Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
 
-        if (course.getStatus() == CourseStatus.COMPLETED || course.getStatus() == CourseStatus.CANCELLED) {
-            throw new RuntimeException("Cannot edit a COMPLETED or CANCELLED course.");
-        }
-
-        User currentUser = getUserByEmail(authentication.getName());
-        boolean isAdmin = authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ADMIN"));
-
-        if (!isAdmin && !course.getTrainer().getId().equals(currentUser.getId())) {
+        User trainer = getUserByEmail(authentication.getName());
+        if (!course.getTrainer().getId().equals(trainer.getId())) {
             throw new RuntimeException("Access Denied. You can only edit your own courses.");
         }
 
-        if (request.getTrainerId() != null && !course.getTrainer().getId().equals(request.getTrainerId())) {
-            if (course.getStatus() == CourseStatus.ACTIVE) {
-                throw new RuntimeException("Schimbarea formatorului este strict interzisă pentru cursurile cu status ACTIVE.");
-            }
-
-            User newTrainer = userRepository.findById(request.getTrainerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("New trainer not found"));
-            if (newTrainer.getRole() != UserRole.FORMATOR) {
-                throw new RuntimeException("The selected user is not a FORMATOR.");
-            }
-            course.setTrainer(newTrainer);
+        if (course.getStatus() != CourseStatus.DRAFT && course.getStatus() != CourseStatus.PENDING_APPROVAL) {
+            throw new RuntimeException("You can only edit courses that are in DRAFT or PENDING_APPROVAL status.");
         }
 
         CourseCategory category = courseCategoryRepository.findById(request.getCategoryId())
@@ -171,77 +194,74 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
         validateDeliveryFormat(request);
         mapFields(course, request, category);
 
-        if (!isAdmin) {
-            course.setStatus(CourseStatus.DRAFT);
-        }
+        course.setStatus(CourseStatus.PENDING_APPROVAL); // Odată editat, reintră în aprobare
 
         return toResponse(courseRepository.save(course));
     }
 
     @Transactional
-    public void deleteCourseSecure(Long id, Authentication authentication) {
+    public void cancelCourseAsTrainer(Long id, Authentication authentication) {
         Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
 
-        boolean isAdmin = authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ADMIN"));
-
-        if (!isAdmin) {
-            User currentUser = getUserByEmail(authentication.getName());
-            if (!course.getTrainer().getId().equals(currentUser.getId())) {
-                throw new RuntimeException("Access Denied. You cannot delete this course.");
-            }
-            if (course.getStatus() != CourseStatus.DRAFT) {
-                throw new RuntimeException("Formators can only delete courses that are in DRAFT status.");
-            }
-        } else {
-            if (course.getCurrentEnrolled() > 0) {
-                throw new RuntimeException("Cannot delete a course that currently has active student enrollments.");
-            }
+        User trainer = getUserByEmail(authentication.getName());
+        if (!course.getTrainer().getId().equals(trainer.getId())) {
+            throw new RuntimeException("Access Denied.");
         }
 
-        courseRepository.delete(course);
+        course.setStatus(CourseStatus.CANCELLED);
+        courseRepository.save(course);
+
+        // Specificații: La anulare se trimit notificări participanților
+        // Vei putea apela un notificationService.sendToAllEnrolled(...) aici
     }
+
+    // ----------------------------------------------------------------------------------
+    // Funcționalități ADMIN
+    // ----------------------------------------------------------------------------------
 
     @Transactional
     public CourseResponse approveCourse(Long id) {
         Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
         course.setStatus(CourseStatus.ACTIVE);
-        return toResponse(courseRepository.save(course));
+        Course savedCourse = courseRepository.save(course);
+
+        notificationService.sendNotification(
+                course.getTrainer().getId(),
+                "Curs Aprobat!",
+                "Cursul tău '" + course.getTitle() + "' a fost aprobat și este acum activ.",
+                NotificationType.SUCCESS,
+                "/courses/" + course.getId()
+        );
+
+        return toResponse(savedCourse);
     }
 
     @Transactional
-    public CourseResponse rejectCourse(Long id) {
+    public CourseResponse rejectCourse(Long id, String reason) {
         Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
-        // Resetăm starea cursului în DRAFT pentru a permite editarea lui de către formator
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
         course.setStatus(CourseStatus.DRAFT);
+        Course savedCourse = courseRepository.save(course);
+
+        notificationService.sendNotification(
+                course.getTrainer().getId(),
+                "Curs Respins",
+                "Cursul '" + course.getTitle() + "' a fost respins. Motiv: " + (reason != null ? reason : "Necunoscut"),
+                NotificationType.WARNING,
+                "/courses/" + course.getId()
+        );
+
+        return toResponse(savedCourse);
+    }
+
+    @Transactional
+    public CourseResponse markAsCompleted(Long id) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+        course.setStatus(CourseStatus.COMPLETED);
         return toResponse(courseRepository.save(course));
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseResponse> findByStatus(CourseStatus status) {
-        return courseRepository.findByStatus(status).stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseResponse> findByTrainerId(Long trainerId) {
-        return courseRepository.findByTrainerId(trainerId).stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseResponse> findByCategoryId(Long categoryId) {
-        return courseRepository.findByCategoryId(categoryId).stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseResponse> findAvailableCourses() {
-        return courseRepository.findAvailableCourses().stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseResponse> findUpcomingCourses(LocalDate date) {
-        return courseRepository.findUpcomingCourses(date).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -249,13 +269,9 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
         return courseRepository.findPendingApprovalCourses().stream().map(this::toResponse).toList();
     }
 
-    @Transactional
-    public CourseResponse updateStatus(Long id, CourseStatus newStatus) {
-        Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
-        course.setStatus(newStatus);
-        return toResponse(courseRepository.save(course));
-    }
+    // ----------------------------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------------------------
 
     private void mapFields(Course entity, CourseRequest request, CourseCategory category) {
         entity.setTitle(request.getTitle());
@@ -294,6 +310,6 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
 
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated identity not found for: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
     }
 }

@@ -22,6 +22,9 @@ public interface AttendanceRepository extends BaseRepository<Attendance> {
     @Query("SELECT COUNT(a) FROM Attendance a WHERE a.session.id = :sessionId AND a.status = 'PRESENT'")
     Long countPresentTeachersInSession(@Param("sessionId") Long sessionId);
 
-    // Necesar pentru a verifica daca exista deja inregistrare bulk ca sa nu duplicam datele
+    // ADĂUGATĂ: Pentru statistici
+    @Query("SELECT COUNT(a) FROM Attendance a WHERE a.session.id = :sessionId AND a.status = 'ABSENT'")
+    Long countAbsentTeachersInSession(@Param("sessionId") Long sessionId);
+
     Optional<Attendance> findBySessionIdAndEnrollmentId(Long sessionId, Long enrollmentId);
 }

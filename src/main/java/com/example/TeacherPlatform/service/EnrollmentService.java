@@ -17,7 +17,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -66,9 +69,11 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
     }
 
     @Override
-    protected void updateEntity(Enrollment entity, EnrollmentRequest request) {
-        // Înscrierile nu se editează prin proprietăți generice
-    }
+    protected void updateEntity(Enrollment entity, EnrollmentRequest request) {}
+
+    // ----------------------------------------------------------------------------------
+    // Funcționalități PROFESOR
+    // ----------------------------------------------------------------------------------
 
     @Transactional
     public EnrollmentResponse createEnrollment(EnrollmentRequest request, Authentication authentication) {
@@ -77,11 +82,11 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + request.getCourseId()));
 
         if (enrollmentRepository.findByCourseIdAndTeacherId(course.getId(), teacher.getId()).isPresent()) {
-            throw new RuntimeException("You are already enrolled in this course");
+            throw new RuntimeException("Ești deja înscris la acest curs.");
         }
 
         if (course.getCurrentEnrolled() >= course.getMaxParticipants()) {
-            throw new RuntimeException("This course has reached its maximum capacity of participants.");
+            throw new RuntimeException("Acest curs și-a atins capacitatea maximă.");
         }
 
         Enrollment enrollment = new Enrollment();
@@ -96,22 +101,19 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getMyEnrollments(Authentication authentication) {
         User teacher = getUserByEmail(authentication.getName());
-        return enrollmentRepository.findByTeacherId(teacher.getId())
-                .stream().map(this::toResponse).toList();
+        return enrollmentRepository.findByTeacherId(teacher.getId()).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getMyActiveEnrollments(Authentication authentication) {
         User teacher = getUserByEmail(authentication.getName());
-        return enrollmentRepository.findConfirmedEnrollmentsByTeacher(teacher.getId())
-                .stream().map(this::toResponse).toList();
+        return enrollmentRepository.findConfirmedEnrollmentsByTeacher(teacher.getId()).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getMyCompletedEnrollments(Authentication authentication) {
         User teacher = getUserByEmail(authentication.getName());
-        return enrollmentRepository.findByTeacherAndStatus(teacher.getId(), EnrollmentStatus.COMPLETED)
-                .stream().map(this::toResponse).toList();
+        return enrollmentRepository.findByTeacherAndStatus(teacher.getId(), EnrollmentStatus.COMPLETED).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -127,37 +129,25 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
 
         User teacher = getUserByEmail(authentication.getName());
         if (!enrollment.getTeacher().getId().equals(teacher.getId())) {
-            throw new RuntimeException("Access Denied. You cannot cancel another user's enrollment.");
+            throw new RuntimeException("Access Denied.");
         }
+        processCancellation(enrollment);
+    }
 
-        if (enrollment.getStatus() == EnrollmentStatus.CONFIRMED) {
-            Course course = enrollment.getCourse();
-            if (course.getCurrentEnrolled() > 0) {
-                course.setCurrentEnrolled(course.getCurrentEnrolled() - 1);
-                courseRepository.save(course); // CORECȚIE: Persistăm modificarea locului eliberat
-            }
+    // ----------------------------------------------------------------------------------
+    // Funcționalități FORMATOR
+    // ----------------------------------------------------------------------------------
+
+    @Transactional
+    public void cancelEnrollmentAsTrainer(Long enrollmentId, Authentication authentication) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
+
+        User trainer = getUserByEmail(authentication.getName());
+        if (!enrollment.getCourse().getTrainer().getId().equals(trainer.getId())) {
+            throw new RuntimeException("Access Denied. You are not the trainer for this course.");
         }
-
-        enrollment.setStatus(EnrollmentStatus.CANCELLED);
-        enrollmentRepository.save(enrollment);
-    }
-
-    @Transactional(readOnly = true)
-    public List<EnrollmentResponse> getEnrollmentsByCourse(Long courseId) {
-        return enrollmentRepository.findByCourseId(courseId)
-                .stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<EnrollmentResponse> getConfirmedEnrollmentsByCourse(Long courseId) {
-        return enrollmentRepository.findConfirmedEnrollmentsByCourse(courseId)
-                .stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<EnrollmentResponse> getPendingEnrollments() {
-        return enrollmentRepository.findPendingEnrollments()
-                .stream().map(this::toResponse).toList();
+        processCancellation(enrollment);
     }
 
     @Transactional
@@ -166,19 +156,44 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
 
         if (enrollment.getStatus() != EnrollmentStatus.PENDING) {
-            throw new RuntimeException("Only PENDING enrollments can be confirmed.");
+            throw new RuntimeException("Doar înscrierile PENDING pot fi confirmate.");
         }
 
         Course course = enrollment.getCourse();
         if (course.getCurrentEnrolled() >= course.getMaxParticipants()) {
-            throw new RuntimeException("Cannot confirm enrollment. The course is already full.");
+            throw new RuntimeException("Cursul este deja plin.");
         }
 
         enrollment.setStatus(EnrollmentStatus.CONFIRMED);
         course.setCurrentEnrolled(course.getCurrentEnrolled() + 1);
-        courseRepository.save(course); // CORECȚIE: Salvare explicită a stării cursului afectat
+        courseRepository.save(course);
 
         return toResponse(enrollmentRepository.save(enrollment));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getCourseEnrollmentStats(Long courseId) {
+        List<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId);
+
+        long total = enrollments.size();
+        long confirmed = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.CONFIRMED).count();
+        long pending = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.PENDING).count();
+        long cancelled = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.CANCELLED).count();
+
+        return Map.of("total", total, "confirmed", confirmed, "pending", pending, "cancelled", cancelled);
+    }
+
+    // ----------------------------------------------------------------------------------
+    // Funcționalități ADMIN
+    // ----------------------------------------------------------------------------------
+
+    @Transactional(readOnly = true)
+    public List<EnrollmentResponse> getEnrollmentsThisMonth() {
+        LocalDateTime startOfMonth = YearMonth.now().atDay(1).atStartOfDay();
+        return enrollmentRepository.findAll().stream()
+                .filter(e -> e.getCreatedAt() != null && e.getCreatedAt().isAfter(startOfMonth))
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -187,15 +202,41 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
 
         if (enrollment.getStatus() != EnrollmentStatus.CONFIRMED) {
-            throw new RuntimeException("Only CONFIRMED enrollments can be marked as completed.");
+            throw new RuntimeException("Doar înscrierile CONFIRMED pot fi finalizate.");
         }
 
         enrollment.setStatus(EnrollmentStatus.COMPLETED);
         return toResponse(enrollmentRepository.save(enrollment));
     }
 
+    @Transactional(readOnly = true)
+    public List<EnrollmentResponse> getEnrollmentsByCourse(Long courseId) {
+        return enrollmentRepository.findByCourseId(courseId).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnrollmentResponse> getPendingEnrollments() {
+        return enrollmentRepository.findPendingEnrollments().stream().map(this::toResponse).toList();
+    }
+
+    // ----------------------------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------------------------
+
+    private void processCancellation(Enrollment enrollment) {
+        if (enrollment.getStatus() == EnrollmentStatus.CONFIRMED) {
+            Course course = enrollment.getCourse();
+            if (course.getCurrentEnrolled() > 0) {
+                course.setCurrentEnrolled(course.getCurrentEnrolled() - 1);
+                courseRepository.save(course);
+            }
+        }
+        enrollment.setStatus(EnrollmentStatus.CANCELLED);
+        enrollmentRepository.save(enrollment);
+    }
+
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found with email: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
     }
 }

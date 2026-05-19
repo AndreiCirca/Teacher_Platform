@@ -10,14 +10,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ADMIN')") // Securizează implicit toate rutele din acest controller pentru ADMIN
 public class UserController extends GenericController<User, UserRequest, UserResponse> {
 
     private final UserService userService;
@@ -27,27 +28,87 @@ public class UserController extends GenericController<User, UserRequest, UserRes
         return userService;
     }
 
+    // -------------------------------------------------------------------------
+    // Profilul Utilizatorului Curent (orice rol)
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserResponse> getMyProfile(Authentication authentication) {
+        return ResponseEntity.ok(userService.getMyProfile(authentication));
+    }
+
+    @PutMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserResponse> updateMyProfile(@Valid @RequestBody UserRequest request, Authentication authentication) {
+        return ResponseEntity.ok(userService.updateMyProfile(request, authentication));
+    }
+
+    @PutMapping("/me/password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> changeMyPassword(@RequestBody Map<String, String> payload, Authentication authentication) {
+        userService.changeMyPassword(payload.get("oldPassword"), payload.get("newPassword"), authentication);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/avatar")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserResponse> updateMyAvatar(@RequestBody Map<String, String> payload, Authentication authentication) {
+        // În viața reală aici primești un MultipartFile, îl urci în Supabase Storage și primești URL-ul.
+        // Pentru API Contract, acceptăm direct URL-ul în format JSON: {"avatarUrl": "https://..."}
+        return ResponseEntity.ok(userService.updateMyAvatar(payload.get("avatarUrl"), authentication));
+    }
+
+    // -------------------------------------------------------------------------
+    // Funcționalități ADMIN
+    // -------------------------------------------------------------------------
+
+    @PutMapping("/{id}/toggle-active")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<UserResponse> toggleActiveStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.toggleActiveStatus(id));
+    }
+
+    @GetMapping("/unverified")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<List<UserResponse>> getUnverifiedUsers() {
+        return ResponseEntity.ok(userService.findUnverifiedUsers());
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Map<String, Long>> getUserStats() {
+        return ResponseEntity.ok(userService.getUserStats());
+    }
+
+    // Blocăm rutele standard CRUD doar pentru ADMIN (ele moștenesc altfel permisiunile lipsă)
+
     @Override
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<UserResponse>> getAll() {
         return super.getAll();
     }
 
     @Override
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
         return super.getById(id);
     }
 
     @Override
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
         return super.create(request);
     }
 
     @Override
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<UserResponse> update(@PathVariable Long id, @Valid @RequestBody UserRequest request) {
         return super.update(id, request);
     }
 
     @Override
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         return super.delete(id);
     }

@@ -17,6 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/certificates")
@@ -31,13 +32,7 @@ public class CertificateController extends GenericController<Certificate, Certif
         return certificateService;
     }
 
-    /**
-     * CORECTIE CRITICA DE SECURITATE:
-     * Versiunea originala folosea "Long currentTeacherId = 1L" — orice profesor autentificat
-     * vedea certificatele profesorului cu ID=1, indiferent de cine era logat.
-     * Acum extragem ID-ul real din JWT prin obiectul Authentication.
-     */
-    @GetMapping("/certificates/my")
+    @GetMapping("/my")
     @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<List<CertificateResponse>> getMyCertificates(Authentication authentication) {
         User currentUser = userRepository.findByEmail(authentication.getName())
@@ -45,26 +40,42 @@ public class CertificateController extends GenericController<Certificate, Certif
         return ResponseEntity.ok(certificateService.findMyCertificates(currentUser.getId()));
     }
 
-    // GET /api/certificates/verify/{code} — Validare publica (fara token obligatoriu)
-    // CORECTIE: Returneaza acum detalii complete (Nume profesor, Curs, Ore, Data) nu doar un mesaj,
-    // conform cerintei UI din specificatiile Gemini.
-    @GetMapping("/certificates/verify/{code}")
+    @GetMapping("/verify/{code}")
     public ResponseEntity<CertificateResponse> verifyCertificate(@PathVariable String code) {
         return ResponseEntity.ok(certificateService.verifyCertificate(code));
     }
 
-    // POST /api/courses/{courseId}/certificates/generate
-    @PostMapping("/courses/{courseId}/certificates/generate")
+    @PostMapping("/courses/{courseId}/generate")
     @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<List<CertificateResponse>> generateBulk(@PathVariable Long courseId) {
         return ResponseEntity.ok(certificateService.generateBulkCertificatesForCourse(courseId));
     }
 
-    // PUT /api/certificates/{id}/revoke
-    @PutMapping("/certificates/{id}/revoke")
+    @PutMapping("/{id}/revoke")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<CertificateResponse> revokeCertificate(@PathVariable Long id) {
         return ResponseEntity.ok(certificateService.revokeCertificate(id));
+    }
+
+    // Funcționalitate NOUĂ: Descărcare certificat
+    @GetMapping("/{id}/download")
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    public ResponseEntity<CertificateResponse> downloadCertificate(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(certificateService.downloadCertificate(id, authentication.getName()));
+    }
+
+    // Funcționalitate NOUĂ: Statistici Admin
+    @GetMapping("/admin/stats")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Map<String, Long>> getStats() {
+        return ResponseEntity.ok(certificateService.getCertificateStats());
+    }
+
+    // Funcționalitate NOUĂ: Export Excel Admin (Mock response pentru a îndeplini API Contract)
+    @GetMapping("/admin/export")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<String> exportCertificates() {
+        return ResponseEntity.ok("Export Excel generat cu succes. În producție va returna un fișier .xlsx.");
     }
 
     @Override

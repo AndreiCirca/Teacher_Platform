@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -26,7 +27,6 @@ public class CertificateService extends GenericService<Certificate, CertificateR
     private final CourseSessionRepository courseSessionRepository;
     private final AttendanceRepository attendanceRepository;
 
-    // Configurație dinamică: dacă nu e definită în proprietăți, valoarea implicită va fi 75
     private final int minAttendancePercentage;
 
     public CertificateService(
@@ -143,13 +143,13 @@ public class CertificateService extends GenericService<Certificate, CertificateR
         List<Certificate> generatedCertificates = new ArrayList<>();
 
         for (Enrollment enrollment : confirmedEnrollments) {
+            enrollment.setStatus(EnrollmentStatus.COMPLETED);
+            enrollmentRepository.save(enrollment);
+
             long presentSessions = attendanceRepository.countPresentSessionsByEnrollment(enrollment.getId());
             double attendancePercentage = ((double) presentSessions / totalSessions) * 100;
 
             if (attendancePercentage >= minAttendancePercentage) {
-                enrollment.setStatus(EnrollmentStatus.COMPLETED);
-                enrollmentRepository.save(enrollment);
-
                 boolean alreadyHasCertificate = certificateRepository.findCertificatesByTeacher(enrollment.getTeacher().getId())
                         .stream().anyMatch(c -> c.getEnrollment().getId().equals(enrollment.getId()));
 
@@ -167,12 +167,30 @@ public class CertificateService extends GenericService<Certificate, CertificateR
 
                     generatedCertificates.add(certificateRepository.save(certificate));
                 }
-            } else {
-                enrollment.setStatus(EnrollmentStatus.CANCELLED);
-                enrollmentRepository.save(enrollment);
             }
         }
 
         return generatedCertificates.stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CertificateResponse downloadCertificate(Long id, String email) {
+        Certificate certificate = certificateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Certificate not found with id: " + id));
+
+        if (!certificate.getEnrollment().getTeacher().getEmail().equals(email)) {
+            throw new RuntimeException("Access Denied. You can only download your own certificates.");
+        }
+        return toResponse(certificate);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getCertificateStats() {
+        long total = certificateRepository.count();
+        long active = certificateRepository.countByStatus(CertificateStatus.ACTIVE);
+        long revoked = certificateRepository.countByStatus(CertificateStatus.REVOKED);
+        long pending = certificateRepository.countByStatus(CertificateStatus.PENDING);
+
+        return Map.of("total", total, "active", active, "revoked", revoked, "pending", pending);
     }
 }

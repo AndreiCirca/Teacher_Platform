@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/materials")
@@ -27,23 +28,25 @@ public class CourseMaterialController extends GenericController<CourseMaterial, 
         return courseMaterialService;
     }
 
-    // GET /api/materials/course/{courseId} — Returnează materialele doar dacă profesorul este înscris confirmat
     @GetMapping("/course/{courseId}")
     @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
     public ResponseEntity<List<CourseMaterialResponse>> getMaterialsByCourse(
             @PathVariable Long courseId,
             Authentication authentication) {
-
         return ResponseEntity.ok(courseMaterialService.findByCourseId(courseId, authentication));
     }
 
-    // PUT /api/materials/{id}/download — Incrementează downloadCount securizat
+    @GetMapping("/my-courses")
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    public ResponseEntity<Map<String, List<CourseMaterialResponse>>> getMyGroupedMaterials(Authentication authentication) {
+        return ResponseEntity.ok(courseMaterialService.findMyGroupedMaterials(authentication));
+    }
+
     @PutMapping("/{id}/download")
     @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
     public ResponseEntity<CourseMaterialResponse> trackDownload(
             @PathVariable Long id,
             Authentication authentication) {
-
         return ResponseEntity.ok(courseMaterialService.incrementDownloadCount(id, authentication));
     }
 

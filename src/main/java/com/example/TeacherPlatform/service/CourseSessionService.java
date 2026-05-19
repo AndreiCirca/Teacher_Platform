@@ -5,10 +5,12 @@ import com.example.TeacherPlatform.dataTransferObject.CourseSessionResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
 import com.example.TeacherPlatform.model.Course;
 import com.example.TeacherPlatform.model.CourseSession;
+import com.example.TeacherPlatform.model.User;
 import com.example.TeacherPlatform.repository.BaseRepository;
 import com.example.TeacherPlatform.repository.CourseRepository;
 import com.example.TeacherPlatform.repository.CourseSessionRepository;
 import com.example.TeacherPlatform.repository.EnrollmentRepository;
+import com.example.TeacherPlatform.repository.UserRepository;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -16,7 +18,9 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 @Service
@@ -26,6 +30,7 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
     private final CourseSessionRepository courseSessionRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final UserRepository userRepository;
 
     @Override
     protected BaseRepository<CourseSession> getRepository() {
@@ -39,7 +44,6 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + request.getCourseId()));
 
-        // CORECTAT: Validare suprapunere orară formator la CREARE (ID-ul sesiunii curente este null)
         validateTrainerAvailability(course.getTrainer().getId(), request.getStartTime(), request.getEndTime(), null);
 
         session.setCourse(course);
@@ -50,7 +54,6 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
         session.setSessionNumber(request.getSessionNumber());
         session.setAttendanceMarked(false);
 
-        // CORECTAT: Sincronizăm sessionCount în Course pentru ca algoritmul bulk din CertificateService să funcționeze corect
         int currentCount = course.getSessionCount() != null ? course.getSessionCount() : 0;
         course.setSessionCount(currentCount + 1);
         courseRepository.save(course);
@@ -61,7 +64,6 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
     @Override
     @Transactional
     protected void updateEntity(CourseSession entity, CourseSessionRequest request) {
-        // CORECTAT: Validăm disponibilitatea și la UPDATE, transmițând entity.getId() pentru a fi ignorat din verificare
         if (entity.getCourse() != null && entity.getCourse().getTrainer() != null) {
             validateTrainerAvailability(entity.getCourse().getTrainer().getId(), request.getStartTime(), request.getEndTime(), entity.getId());
         }
@@ -100,19 +102,21 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
             throw new ResourceNotFoundException("Course not found with id: " + courseId);
         }
 
-        String username = authentication.getName();
-        boolean isTeacher = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(auth -> "PROFESOR".equals(auth));
+        if (authentication != null) {
+            String username = authentication.getName();
+            boolean isTeacher = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch(auth -> "PROFESOR".equals(auth));
 
-        // Securitate la nivel de rând: Profesorii văd sesiunile doar dacă sunt înscriși confirmat
-        if (isTeacher) {
-            boolean hasAccess = enrollmentRepository.hasConfirmedOrCompletedEnrollment(courseId, username);
-            if (!hasAccess) {
-                throw new RuntimeException("Access denied. You must have a confirmed enrollment to view course sessions.");
+            if (isTeacher) {
+                boolean hasAccess = enrollmentRepository.hasConfirmedOrCompletedEnrollment(courseId, username);
+                if (!hasAccess) {
+                    throw new RuntimeException("Access denied. You must have a confirmed enrollment to view course sessions.");
+                }
             }
         }
 
+        // Am corectat numele metodei apelate din repository
         return courseSessionRepository.findByCourseIdOrdered(courseId)
                 .stream()
                 .map(this::toResponse)
@@ -135,15 +139,48 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
                 .toList();
     }
 
-    /**
-     * METODĂ PRIVATĂ HELPER: Validează dacă formatorul este liber în intervalul selectat.
-     * Dacă se face update, se trimite currentSessionId pentru ca sesiunea curentă să fie exclusă (să nu se autoblocheze).
-     */
+    @Transactional(readOnly = true)
+    public List<CourseSessionResponse> findThisWeekSessions(Authentication authentication) {
+        User trainer = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("Formatorul nu a fost găsit"));
+
+        LocalDateTime startOfWeek = LocalDateTime.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).withHour(0).withMinute(0);
+        LocalDateTime endOfWeek = LocalDateTime.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).withHour(23).withMinute(59);
+
+        return courseSessionRepository.findSessionsByTimeRange(startOfWeek, endOfWeek)
+                .stream()
+                .filter(session -> session.getCourse() != null
+                        && session.getCourse().getTrainer() != null
+                        && session.getCourse().getTrainer().getId().equals(trainer.getId()))
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long id) {
+        CourseSession session = courseSessionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + id));
+
+        if (session.getAttendanceMarked()) {
+            throw new RuntimeException("Cannot delete a session where attendance has already been marked.");
+        }
+
+        if (session.getCourse() != null) {
+            Course course = session.getCourse();
+            int currentCount = course.getSessionCount() != null ? course.getSessionCount() : 0;
+            course.setSessionCount(Math.max(0, currentCount - 1));
+            courseRepository.save(course);
+        }
+
+        super.delete(id);
+    }
+
     private void validateTrainerAvailability(Long trainerId, LocalDateTime start, LocalDateTime end, Long currentSessionId) {
         boolean hasOverlap = courseSessionRepository.findAll().stream()
                 .filter(s -> s.getCourse() != null && s.getCourse().getTrainer() != null
                         && s.getCourse().getTrainer().getId().equals(trainerId))
-                .filter(s -> currentSessionId == null || !s.getId().equals(currentSessionId)) // exclude sesiunea curentă la editare
+                .filter(s -> currentSessionId == null || !s.getId().equals(currentSessionId))
                 .anyMatch(s -> start.isBefore(s.getEndTime()) && end.isAfter(s.getStartTime()));
 
         if (hasOverlap) {

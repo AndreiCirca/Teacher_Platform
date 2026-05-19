@@ -33,63 +33,76 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
     // PROFESOR
     // -------------------------------------------------------------------------
 
-    /**
-     * Schimbat din @PostMapping simplu în @PostMapping("/secure") pentru a evita
-     * conflictul (Ambiguous mapping) cu metoda create() din GenericController.
-     */
     @PostMapping("/secure")
-    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<EnrollmentResponse> createEnrollment(
             @Valid @RequestBody EnrollmentRequest request,
             Authentication authentication) {
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(enrollmentService.createEnrollment(request, authentication));
+        return ResponseEntity.status(HttpStatus.CREATED).body(enrollmentService.createEnrollment(request, authentication));
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<List<EnrollmentResponse>> getMyEnrollments(Authentication authentication) {
         return ResponseEntity.ok(enrollmentService.getMyEnrollments(authentication));
     }
 
     @GetMapping("/my/active")
-    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<List<EnrollmentResponse>> getMyActiveEnrollments(Authentication authentication) {
         return ResponseEntity.ok(enrollmentService.getMyActiveEnrollments(authentication));
     }
 
     @GetMapping("/my/completed")
-    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<List<EnrollmentResponse>> getMyCompletedEnrollments(Authentication authentication) {
         return ResponseEntity.ok(enrollmentService.getMyCompletedEnrollments(authentication));
     }
 
     @GetMapping("/check/{courseId}")
-    @PreAuthorize("hasAnyAuthority('PROFESOR')")
-    public ResponseEntity<Map<String, Boolean>> checkEnrollment(
-            @PathVariable Long courseId,
-            Authentication authentication) {
-        return ResponseEntity.ok(
-                Map.of("enrolled", enrollmentService.checkEnrollment(courseId, authentication))
-        );
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    public ResponseEntity<Map<String, Boolean>> checkEnrollment(@PathVariable Long courseId, Authentication authentication) {
+        return ResponseEntity.ok(Map.of("enrolled", enrollmentService.checkEnrollment(courseId, authentication)));
     }
 
-    @PutMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    @DeleteMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<Void> cancelEnrollment(@PathVariable Long id, Authentication authentication) {
         enrollmentService.cancelEnrollment(id, authentication);
         return ResponseEntity.noContent().build();
     }
 
     // -------------------------------------------------------------------------
-    // FORMATOR / ADMIN
+    // FORMATOR
     // -------------------------------------------------------------------------
 
     @PutMapping("/{id}/confirm")
     @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<EnrollmentResponse> confirmEnrollment(@PathVariable Long id) {
         return ResponseEntity.ok(enrollmentService.confirmEnrollment(id));
+    }
+
+    @PutMapping("/{id}/cancel-participant")
+    @PreAuthorize("hasAuthority('FORMATOR')")
+    public ResponseEntity<Void> cancelParticipant(@PathVariable Long id, Authentication authentication) {
+        enrollmentService.cancelEnrollmentAsTrainer(id, authentication);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/course/{courseId}/stats")
+    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
+    public ResponseEntity<Map<String, Long>> getCourseStats(@PathVariable Long courseId) {
+        return ResponseEntity.ok(enrollmentService.getCourseEnrollmentStats(courseId));
+    }
+
+    // -------------------------------------------------------------------------
+    // ADMIN / COMUN
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/admin/this-month")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<List<EnrollmentResponse>> getEnrollmentsThisMonth() {
+        return ResponseEntity.ok(enrollmentService.getEnrollmentsThisMonth());
     }
 
     @PutMapping("/{id}/complete")
@@ -104,22 +117,13 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
         return ResponseEntity.ok(enrollmentService.getEnrollmentsByCourse(courseId));
     }
 
-    @GetMapping("/course/{courseId}/confirmed")
-    @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
-    public ResponseEntity<List<EnrollmentResponse>> getConfirmedByCourse(@PathVariable Long courseId) {
-        return ResponseEntity.ok(enrollmentService.getConfirmedEnrollmentsByCourse(courseId));
-    }
-
     @GetMapping("/pending")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'FORMATOR')")
     public ResponseEntity<List<EnrollmentResponse>> getPendingEnrollments() {
         return ResponseEntity.ok(enrollmentService.getPendingEnrollments());
     }
 
-    // -------------------------------------------------------------------------
-    // INVALIDĂRI METODE GENERICE (Previn conflictele de mapare Spring)
-    // -------------------------------------------------------------------------
-
+    // Invalidare metode generice
     @Override
     public ResponseEntity<EnrollmentResponse> create(@Valid @RequestBody EnrollmentRequest request) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
@@ -131,8 +135,8 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
     }
 
     @Override
-    @PreAuthorize("hasAnyAuthority('PROFESOR')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
+        return super.delete(id);
     }
 }
