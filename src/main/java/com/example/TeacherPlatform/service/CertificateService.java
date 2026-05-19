@@ -4,6 +4,7 @@ import com.example.TeacherPlatform.dataTransferObject.CertificateRequest;
 import com.example.TeacherPlatform.dataTransferObject.CertificateResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
 import com.example.TeacherPlatform.model.*;
+import com.example.TeacherPlatform.model.enums.AttendanceStatus;
 import com.example.TeacherPlatform.model.enums.CertificateStatus;
 import com.example.TeacherPlatform.model.enums.EnrollmentStatus;
 import com.example.TeacherPlatform.repository.*;
@@ -146,7 +147,7 @@ public class CertificateService extends GenericService<Certificate, CertificateR
             enrollment.setStatus(EnrollmentStatus.COMPLETED);
             enrollmentRepository.save(enrollment);
 
-            long presentSessions = attendanceRepository.countPresentSessionsByEnrollment(enrollment.getId());
+            long presentSessions = attendanceRepository.countPresentSessionsByEnrollment(enrollment.getId(), AttendanceStatus.PRESENT);
             double attendancePercentage = ((double) presentSessions / totalSessions) * 100;
 
             if (attendancePercentage >= minAttendancePercentage) {

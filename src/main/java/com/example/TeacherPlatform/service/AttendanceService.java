@@ -122,8 +122,8 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
     @Transactional(readOnly = true)
     public Map<String, Long> getAttendanceStats(Long sessionId) {
         return Map.of(
-                "present", attendanceRepository.countPresentTeachersInSession(sessionId),
-                "absent", attendanceRepository.countAbsentTeachersInSession(sessionId)
+                "present", attendanceRepository.countPresentTeachersInSession(sessionId, AttendanceStatus.PRESENT),
+                "absent", attendanceRepository.countAbsentTeachersInSession(sessionId, AttendanceStatus.ABSENT)
         );
     }
 }

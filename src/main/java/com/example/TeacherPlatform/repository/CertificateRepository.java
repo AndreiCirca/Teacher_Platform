@@ -29,9 +29,9 @@ public interface CertificateRepository extends BaseRepository<Certificate> {
     @Query("SELECT c FROM Certificate c WHERE c.issuedDate >= :startDate AND c.issuedDate <= :endDate ORDER BY c.issuedDate DESC")
     List<Certificate> findCertificatesByDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
     
-    @Query("SELECT c FROM Certificate c WHERE c.status = 'PENDING' ORDER BY c.createdAt ASC")
-    List<Certificate> findPendingCertificates();
-    
+    @Query("SELECT c FROM Certificate c WHERE c.status = :status ORDER BY c.createdAt ASC")
+    List<Certificate> findPendingCertificates(@Param("status") CertificateStatus status);
+
     @Query("SELECT COUNT(c) FROM Certificate c WHERE c.status = :status")
     Long countByStatus(@Param("status") CertificateStatus status);
 }

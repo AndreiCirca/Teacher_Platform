@@ -113,12 +113,12 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
 
     @Transactional(readOnly = true)
     public List<CourseResponse> findAvailableCourses() {
-        return courseRepository.findAvailableCourses().stream().map(this::toResponse).toList();
+        return courseRepository.findAvailableCourses(CourseStatus.ACTIVE).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<CourseResponse> findUpcomingCourses() {
-        return courseRepository.findUpcomingCourses(LocalDate.now()).stream().map(this::toResponse).toList();
+        return courseRepository.findUpcomingCourses(LocalDate.now(), CourseStatus.ACTIVE).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -266,7 +266,7 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
 
     @Transactional(readOnly = true)
     public List<CourseResponse> findPendingApprovalCourses() {
-        return courseRepository.findPendingApprovalCourses().stream().map(this::toResponse).toList();
+        return courseRepository.findPendingApprovalCourses(CourseStatus.PENDING_APPROVAL).stream().map(this::toResponse).toList();
     }
 
     // ----------------------------------------------------------------------------------
