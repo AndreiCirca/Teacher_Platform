@@ -69,12 +69,18 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
 
     @Transactional(readOnly = true)
     public List<AttendanceResponse> findBySessionId(Long sessionId) {
-        return attendanceRepository.findBySessionId(sessionId).stream().map(this::toResponse).toList();
+        return attendanceRepository.findBySessionId(sessionId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<AttendanceResponse> findByEnrollmentId(Long enrollmentId) {
-        return attendanceRepository.findAttendanceByEnrollmentOrdered(enrollmentId).stream().map(this::toResponse).toList();
+        return attendanceRepository.findAttendanceByEnrollmentOrdered(enrollmentId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -122,8 +128,8 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
     @Transactional(readOnly = true)
     public Map<String, Long> getAttendanceStats(Long sessionId) {
         return Map.of(
-                "present", attendanceRepository.countPresentTeachersInSession(sessionId, AttendanceStatus.PRESENT),
-                "absent", attendanceRepository.countAbsentTeachersInSession(sessionId, AttendanceStatus.ABSENT)
+                "present", attendanceRepository.countBySessionIdAndStatus(sessionId, AttendanceStatus.PRESENT),
+                "absent",  attendanceRepository.countBySessionIdAndStatus(sessionId, AttendanceStatus.ABSENT)
         );
     }
 }

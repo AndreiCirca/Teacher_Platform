@@ -118,10 +118,9 @@ public class NotificationService extends GenericService<Notification, Notificati
     @Transactional(readOnly = true)
     public List<NotificationResponse> findRecentMyNotifications(Authentication authentication) {
         User user = getUserByEmail(authentication.getName());
-        // Fetch all recent (ordered DESC) and limit to 10 at service layer (JPQL LIMIT not portable)
+        // Se limitează automat la nivel de query din repository la maximum 10 înregistrări conform specificațiilor
         return notificationRepository.findRecentNotificationsByUser(user.getId())
                 .stream()
-                .limit(10)
                 .map(this::toResponse)
                 .toList();
     }
