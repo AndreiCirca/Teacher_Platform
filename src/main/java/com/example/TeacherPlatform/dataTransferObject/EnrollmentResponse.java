@@ -10,9 +10,9 @@ public class EnrollmentResponse {
     private Long courseId;
     private String courseTitle;
     private Long teacherId;
-    private String teacherFullName;
+    private String teacherFirstName;
+    private String teacherLastName;
     private EnrollmentStatus status;
     private Boolean certificateGenerated;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }
