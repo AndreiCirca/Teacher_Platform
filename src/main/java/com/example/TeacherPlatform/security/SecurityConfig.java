@@ -3,6 +3,7 @@ package com.example.TeacherPlatform.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -29,14 +30,35 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Rute publice
+
+                        // ── PUBLIC ──────────────────────────────────────────
                         .requestMatchers("/api/auth/**").permitAll()
-                        // Doar ADMIN
-                        .requestMatchers("/api/schools/**").hasRole("ADMIN")
-                        .requestMatchers("/api/users/**").hasRole("ADMIN")
-                        // ADMIN sau FORMATOR
-                        .requestMatchers("/api/courses/**").hasAnyRole("ADMIN", "FORMATOR")
-                        // Orice user autentificat
+
+                        // Catalog public
+                        .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/schools/**").permitAll()
+
+                        // Verificare certificat public
+                        .requestMatchers(HttpMethod.GET, "/api/certificates/verify/**").permitAll()
+
+                        // ── ADMIN only ───────────────────────────────────────
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/schools/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/schools/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/schools/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
+
+                        // ── FORMATOR only ────────────────────────────────────
+                        .requestMatchers(HttpMethod.POST, "/api/courses/**").hasAnyRole("FORMATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/courses/**").hasAnyRole("FORMATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/courses/**").hasAnyRole("FORMATOR", "ADMIN")
+                        .requestMatchers("/api/sessions/**").hasAnyRole("FORMATOR", "ADMIN")
+                        .requestMatchers("/api/attendance/**").hasAnyRole("FORMATOR", "ADMIN")
+
+                        // ── Orice utilizator autentificat ────────────────────
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
