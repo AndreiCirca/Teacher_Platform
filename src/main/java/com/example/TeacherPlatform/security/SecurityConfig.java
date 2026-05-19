@@ -35,15 +35,33 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // 1. Rute publice generale
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/schools/**").permitAll()
-                        .requestMatchers("/api/schools/**").hasRole("ADMIN")
-                        .requestMatchers("/api/users/**").hasRole("ADMIN")
-                        .requestMatchers("/api/courses/**").hasAnyRole("ADMIN", "FORMATOR")
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
-                        .requestMatchers("/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
+
+                        // 2. Reguli specifice pentru Certificate
+                        .requestMatchers(HttpMethod.GET, "/api/certificates/verify/{code}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/certificates/my").hasAuthority("PROFESOR")
+                        .requestMatchers("/api/certificates/**").hasAuthority("ADMIN")
+
+                        // 3. Reguli specifice pentru CourseMaterial
+                        .requestMatchers(HttpMethod.GET, "/api/materials/course/{courseId}").hasAnyAuthority("PROFESOR", "FORMATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/materials/{id}/download").hasAnyAuthority("PROFESOR", "FORMATOR", "ADMIN")
+                        .requestMatchers("/api/materials/**").hasAnyAuthority("FORMATOR", "ADMIN")
+
+                        // 4. Reguli pentru celelalte entități existente
+                        .requestMatchers("/api/schools/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/categories/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/courses/**").hasAnyAuthority("ADMIN", "FORMATOR")
+
+                        // 5. Reguli Notificări
                         .requestMatchers("/api/notifications/my/**").authenticated()
-                        .requestMatchers("/api/notifications/**").hasAnyRole("ADMIN", "FORMATOR", "PROFESOR")
+                        .requestMatchers("/api/notifications/**").hasAnyAuthority("ADMIN", "FORMATOR", "PROFESOR")
+
+                        // Orice alt request neverificat mai sus cere autentificare generică
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -85,5 +103,4 @@ public class SecurityConfig {
             AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
-
 }
