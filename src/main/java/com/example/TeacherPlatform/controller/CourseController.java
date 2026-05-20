@@ -29,18 +29,10 @@ public class CourseController extends GenericController<Course, CourseRequest, C
         return courseService;
     }
 
-    // ----------------------------------------------------------------------------------
-    // Rute Publice (Acesibile fără autentificare / tuturor)
-    // ----------------------------------------------------------------------------------
-
+    // Public
     @Override
     public ResponseEntity<List<CourseResponse>> getAll() {
-        return ResponseEntity.ok(courseService.findAvailableCourses());
-    }
-
-    @GetMapping("/available")
-    public ResponseEntity<List<CourseResponse>> getAvailable() {
-        return ResponseEntity.ok(courseService.findAvailableCourses());
+        return ResponseEntity.ok(courseService.findUpcomingCourses());
     }
 
     @GetMapping("/upcoming")
@@ -48,37 +40,34 @@ public class CourseController extends GenericController<Course, CourseRequest, C
         return ResponseEntity.ok(courseService.findUpcomingCourses());
     }
 
+    @GetMapping("/available")
+    public ResponseEntity<List<CourseResponse>> getAvailable() {
+        return ResponseEntity.ok(courseService.findAvailableCourses());
+    }
+
     @GetMapping("/popular")
     public ResponseEntity<List<CourseResponse>> getPopular() {
         return ResponseEntity.ok(courseService.findPopularCourses());
     }
 
-    @GetMapping("/category/{categoryId}")
-    public ResponseEntity<List<CourseResponse>> getByCategory(@PathVariable Long categoryId) {
-        return ResponseEntity.ok(courseService.findByCategoryId(categoryId));
+    @GetMapping("/by-professor")
+    public ResponseEntity<List<CourseResponse>> getByProfessorEmail(@RequestParam String email) {
+        return ResponseEntity.ok(courseService.findByProfesorEmail(email));
     }
 
-    // ----------------------------------------------------------------------------------
-    // Rute FORMATOR
-    // ----------------------------------------------------------------------------------
-
-    // FORMATORUL propune un curs nou. Acoperim metoda create() din GenericController.
+    // FORMATOR
     @Override
     @PostMapping
     @PreAuthorize("hasAuthority('FORMATOR')")
-    public ResponseEntity<CourseResponse> create(
-            @Valid @RequestBody CourseRequest request) {
-        // Aceasta este doar ca să anulăm mappingul implicit. Nu o folosim.
+    public ResponseEntity<CourseResponse> create(@Valid @RequestBody CourseRequest request) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
     }
 
-    // Metoda reală pentru Formator
-    @PostMapping("/propose")
+    @PostMapping("/create")
     @PreAuthorize("hasAuthority('FORMATOR')")
     public ResponseEntity<CourseResponse> createCourseAsTrainer(
-            @Valid @RequestBody CourseRequest request,
-            Authentication authentication) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(courseService.proposeCourse(request, authentication));
+            @Valid @RequestBody CourseRequest request, Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(courseService.create(request));
     }
 
     @GetMapping("/my")
@@ -87,45 +76,35 @@ public class CourseController extends GenericController<Course, CourseRequest, C
         return ResponseEntity.ok(courseService.findMyCoursesAsTrainer(authentication));
     }
 
-    // Suprascriem metoda update din GenericController ca să evite "Ambiguous mapping"
     @Override
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('FORMATOR')")
-    public ResponseEntity<CourseResponse> update(
-            @PathVariable Long id,
-            @Valid @RequestBody CourseRequest request) {
-        // Din nou, doar ascundem ruta generică, apelând metoda cu Authentication o vom face explicit
+    public ResponseEntity<CourseResponse> update(@PathVariable Long id, @Valid @RequestBody CourseRequest request) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
     }
 
-    // Metoda reală pentru update
     @PutMapping("/{id}/edit")
     @PreAuthorize("hasAuthority('FORMATOR')")
     public ResponseEntity<CourseResponse> updateCourseAsTrainer(
-            @PathVariable Long id,
-            @Valid @RequestBody CourseRequest request,
-            Authentication authentication) {
-        return ResponseEntity.ok(courseService.updateCourseAsTrainer(id, request, authentication));
+            @PathVariable Long id, @Valid @RequestBody CourseRequest request, Authentication authentication) {
+        return ResponseEntity.ok(courseService.update(id, request));
     }
 
-    @PutMapping("/{id}/cancel")
+    @DeleteMapping("/{id}/cancel")
     @PreAuthorize("hasAuthority('FORMATOR')")
     public ResponseEntity<Void> cancelCourseAsTrainer(@PathVariable Long id, Authentication authentication) {
         courseService.cancelCourseAsTrainer(id, authentication);
         return ResponseEntity.noContent().build();
     }
 
-    // ----------------------------------------------------------------------------------
-    // Rute ADMIN
-    // ----------------------------------------------------------------------------------
-
+    // ADMIN
     @GetMapping("/admin/all")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<CourseResponse>> getAllForAdmin() {
         return ResponseEntity.ok(courseService.findAll());
     }
 
-    @GetMapping("/pending")
+    @GetMapping("/pending-approval")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<CourseResponse>> getPendingApproval() {
         return ResponseEntity.ok(courseService.findPendingApprovalCourses());
@@ -133,20 +112,19 @@ public class CourseController extends GenericController<Course, CourseRequest, C
 
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<CourseResponse> approveCourse(@PathVariable Long id) {
+    public ResponseEntity<CourseResponse> approve(@PathVariable Long id) {
         return ResponseEntity.ok(courseService.approveCourse(id));
     }
 
     @PutMapping("/{id}/reject")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<CourseResponse> rejectCourse(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        String reason = payload.get("reason");
-        return ResponseEntity.ok(courseService.rejectCourse(id, reason));
+    public ResponseEntity<CourseResponse> reject(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        return ResponseEntity.ok(courseService.rejectCourse(id, payload.get("reason")));
     }
 
-    @PutMapping("/{id}/complete")
+    @PutMapping("/{id}/complete-course")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<CourseResponse> completeCourse(@PathVariable Long id) {
+    public ResponseEntity<CourseResponse> markCompleted(@PathVariable Long id) {
         return ResponseEntity.ok(courseService.markAsCompleted(id));
     }
 

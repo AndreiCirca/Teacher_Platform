@@ -6,6 +6,7 @@ import lombok.Data;
 
 @Data
 public class CourseMaterialRequest {
+
     @NotNull(message = "Course ID is required")
     private Long courseId;
 
@@ -22,6 +23,5 @@ public class CourseMaterialRequest {
     private String fileUrl;
 
     private String description;
-
     private Integer downloadCount = 0;
 }

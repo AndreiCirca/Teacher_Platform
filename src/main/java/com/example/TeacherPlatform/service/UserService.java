@@ -32,21 +32,15 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         return userRepository;
     }
 
-    // -------------------------------------------------------------------------
-    // Funcționalități Profil Propriu (Acesibile oricărui utilizator logat)
-    // -------------------------------------------------------------------------
-
     @Transactional(readOnly = true)
     public UserResponse getMyProfile(Authentication authentication) {
-        User user = getUserByEmail(authentication.getName());
-        return toResponse(user);
+        return toResponse(getUserByEmail(authentication.getName()));
     }
 
     @Transactional
     public UserResponse updateMyProfile(UserRequest request, Authentication authentication) {
         User user = getUserByEmail(authentication.getName());
 
-        // Verificăm dacă vrea să folosească un email care e deja luat de altcineva (deși conform spec, emailul nu prea se schimbă, dar îl protejăm)
         String emailClean = request.getEmail().trim().toLowerCase();
         userRepository.findByEmail(emailClean).ifPresent(existing -> {
             if (!existing.getId().equals(user.getId())) {
@@ -55,8 +49,6 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         });
 
         School oldSchool = user.getSchool();
-
-        // Actualizăm doar câmpurile permise pentru profil
         user.setFirstName(request.getFirstName().trim());
         user.setLastName(request.getLastName().trim());
         user.setPhoneNumber(request.getPhoneNumber());
@@ -69,18 +61,15 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
 
         User updatedUser = userRepository.save(user);
         handleSchoolCounters(oldSchool, user.getRole(), updatedUser);
-
         return toResponse(updatedUser);
     }
 
     @Transactional
     public void changeMyPassword(String oldPassword, String newPassword, Authentication authentication) {
         User user = getUserByEmail(authentication.getName());
-
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new RuntimeException("Parola curentă este incorectă.");
         }
-
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
@@ -92,10 +81,6 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         return toResponse(userRepository.save(user));
     }
 
-    // -------------------------------------------------------------------------
-    // Funcționalități ADMIN
-    // -------------------------------------------------------------------------
-
     @Transactional
     public UserResponse toggleActiveStatus(Long id) {
         User user = userRepository.findById(id)
@@ -103,7 +88,6 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
 
         user.setActive(!user.getActive());
 
-        // Dacă dezactivăm un profesor, trebuie să-l scădem din numărătoarea școlii
         if (user.getRole() == UserRole.PROFESOR && user.getSchool() != null) {
             School school = user.getSchool();
             if (user.getActive()) {
@@ -119,8 +103,7 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
 
     @Transactional(readOnly = true)
     public List<UserResponse> findUnverifiedUsers() {
-        return userRepository.findUnverifiedUsers()
-                .stream().map(this::toResponse).toList();
+        return userRepository.findUnverifiedUsers().stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -129,9 +112,7 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         long profesori = userRepository.countByRole(UserRole.PROFESOR);
         long formatori = userRepository.countByRole(UserRole.FORMATOR);
         long admini = userRepository.countByRole(UserRole.ADMIN);
-
         long activi = userRepository.findAll().stream().filter(User::getActive).count();
-        long inactivi = total - activi;
 
         return Map.of(
                 "total", total,
@@ -139,13 +120,9 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
                 "formatori", formatori,
                 "admini", admini,
                 "activi", activi,
-                "inactivi", inactivi
+                "inactivi", total - activi
         );
     }
-
-    // -------------------------------------------------------------------------
-    // Suprascrieri CRUD Generice
-    // -------------------------------------------------------------------------
 
     @Override
     @Transactional
@@ -154,16 +131,13 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         if (userRepository.findByEmail(emailClean).isPresent()) {
             throw new RuntimeException("An account with this email address already exists.");
         }
-
         User user = toEntity(request);
         User savedUser = userRepository.save(user);
-
         if (savedUser.getRole() == UserRole.PROFESOR && savedUser.getSchool() != null) {
             School school = savedUser.getSchool();
             school.setTeacherCount(school.getTeacherCount() + 1);
             schoolRepository.save(school);
         }
-
         return toResponse(savedUser);
     }
 
@@ -182,12 +156,9 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
 
         School oldSchool = user.getSchool();
         UserRole oldRole = user.getRole();
-
         updateEntity(user, request);
         User updatedUser = userRepository.save(user);
-
         handleSchoolCounters(oldSchool, oldRole, updatedUser);
-
         return toResponse(updatedUser);
     }
 
@@ -196,13 +167,11 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
     public void delete(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-
         if (user.getRole() == UserRole.PROFESOR && user.getSchool() != null) {
             School school = user.getSchool();
             school.setTeacherCount(Math.max(0, school.getTeacherCount() - 1));
             schoolRepository.save(school);
         }
-
         super.delete(id);
     }
 
@@ -223,12 +192,10 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         response.setFullName(entity.getFullName());
         response.setEmail(entity.getEmail());
         response.setRole(entity.getRole());
-
         if (entity.getSchool() != null) {
             response.setSchoolId(entity.getSchool().getId());
             response.setSchoolName(entity.getSchool().getName());
         }
-
         response.setActive(entity.getActive());
         response.setEmailVerified(entity.getEmailVerified());
         response.setPhoneNumber(entity.getPhoneNumber());
@@ -251,11 +218,10 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         entity.setLastName(request.getLastName().trim());
         entity.setEmail(request.getEmail().trim().toLowerCase());
         entity.setRole(request.getRole());
-        entity.setActive(request.getActive());
-        entity.setEmailVerified(request.getEmailVerified());
+        entity.setActive(request.getActive() != null ? request.getActive() : true);
+        entity.setEmailVerified(request.getEmailVerified() != null ? request.getEmailVerified() : false);
         entity.setPhoneNumber(request.getPhoneNumber());
         entity.setAvatarUrl(request.getAvatarUrl());
-
         if (request.getSchoolId() != null) {
             School school = schoolRepository.findById(request.getSchoolId())
                     .orElseThrow(() -> new ResourceNotFoundException("School not found with id: " + request.getSchoolId()));

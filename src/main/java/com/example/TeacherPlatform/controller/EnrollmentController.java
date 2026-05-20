@@ -29,16 +29,13 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
         return enrollmentService;
     }
 
-    // -------------------------------------------------------------------------
     // PROFESOR
-    // -------------------------------------------------------------------------
-
     @PostMapping("/secure")
     @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<EnrollmentResponse> createEnrollment(
-            @Valid @RequestBody EnrollmentRequest request,
-            Authentication authentication) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(enrollmentService.createEnrollment(request, authentication));
+            @Valid @RequestBody EnrollmentRequest request, Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(enrollmentService.createEnrollment(request, authentication));
     }
 
     @GetMapping("/my")
@@ -59,12 +56,6 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
         return ResponseEntity.ok(enrollmentService.getMyCompletedEnrollments(authentication));
     }
 
-    @GetMapping("/check/{courseId}")
-    @PreAuthorize("hasAuthority('PROFESOR')")
-    public ResponseEntity<Map<String, Boolean>> checkEnrollment(@PathVariable Long courseId, Authentication authentication) {
-        return ResponseEntity.ok(Map.of("enrolled", enrollmentService.checkEnrollment(courseId, authentication)));
-    }
-
     @DeleteMapping("/{id}/cancel")
     @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<Void> cancelEnrollment(@PathVariable Long id, Authentication authentication) {
@@ -72,10 +63,7 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
         return ResponseEntity.noContent().build();
     }
 
-    // -------------------------------------------------------------------------
     // FORMATOR
-    // -------------------------------------------------------------------------
-
     @PutMapping("/{id}/confirm")
     @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<EnrollmentResponse> confirmEnrollment(@PathVariable Long id) {
@@ -95,16 +83,7 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
         return ResponseEntity.ok(enrollmentService.getCourseEnrollmentStats(courseId));
     }
 
-    // -------------------------------------------------------------------------
-    // ADMIN / COMUN
-    // -------------------------------------------------------------------------
-
-    @GetMapping("/admin/this-month")
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<List<EnrollmentResponse>> getEnrollmentsThisMonth() {
-        return ResponseEntity.ok(enrollmentService.getEnrollmentsThisMonth());
-    }
-
+    // ADMIN / COMMON
     @PutMapping("/{id}/complete")
     @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<EnrollmentResponse> completeEnrollment(@PathVariable Long id) {
@@ -123,7 +102,7 @@ public class EnrollmentController extends GenericController<Enrollment, Enrollme
         return ResponseEntity.ok(enrollmentService.getPendingEnrollments());
     }
 
-    // Invalidare metode generice
+    // Disabled generic routes
     @Override
     public ResponseEntity<EnrollmentResponse> create(@Valid @RequestBody EnrollmentRequest request) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();

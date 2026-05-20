@@ -31,8 +31,7 @@ public class CourseMaterialController extends GenericController<CourseMaterial, 
     @GetMapping("/course/{courseId}")
     @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
     public ResponseEntity<List<CourseMaterialResponse>> getMaterialsByCourse(
-            @PathVariable Long courseId,
-            Authentication authentication) {
+            @PathVariable Long courseId, Authentication authentication) {
         return ResponseEntity.ok(courseMaterialService.findByCourseId(courseId, authentication));
     }
 
@@ -44,9 +43,7 @@ public class CourseMaterialController extends GenericController<CourseMaterial, 
 
     @PutMapping("/{id}/download")
     @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
-    public ResponseEntity<CourseMaterialResponse> trackDownload(
-            @PathVariable Long id,
-            Authentication authentication) {
+    public ResponseEntity<CourseMaterialResponse> trackDownload(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(courseMaterialService.incrementDownloadCount(id, authentication));
     }
 

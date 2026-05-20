@@ -3,9 +3,14 @@ package com.example.TeacherPlatform.service;
 import com.example.TeacherPlatform.dataTransferObject.AttendanceRequest;
 import com.example.TeacherPlatform.dataTransferObject.AttendanceResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
-import com.example.TeacherPlatform.model.*;
+import com.example.TeacherPlatform.model.Attendance;
+import com.example.TeacherPlatform.model.CourseSession;
+import com.example.TeacherPlatform.model.Enrollment;
 import com.example.TeacherPlatform.model.enums.AttendanceStatus;
-import com.example.TeacherPlatform.repository.*;
+import com.example.TeacherPlatform.repository.AttendanceRepository;
+import com.example.TeacherPlatform.repository.BaseRepository;
+import com.example.TeacherPlatform.repository.CourseSessionRepository;
+import com.example.TeacherPlatform.repository.EnrollmentRepository;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,7 +39,6 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
                 .orElseThrow(() -> new ResourceNotFoundException("Sesiunea nu a fost găsită"));
         Enrollment enrollment = enrollmentRepository.findById(request.getEnrollmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Înscrierea nu a fost găsită"));
-
         attendance.setSession(session);
         attendance.setEnrollment(enrollment);
         attendance.setStatus(request.getStatus() != null ? request.getStatus() : AttendanceStatus.NOT_MARKED);
@@ -49,13 +53,11 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
         response.setSessionNumber(entity.getSession().getSessionNumber());
         response.setSessionTopic(entity.getSession().getTopic());
         response.setEnrollmentId(entity.getEnrollment().getId());
-
         if (entity.getEnrollment().getTeacher() != null) {
             response.setTeacherId(entity.getEnrollment().getTeacher().getId());
             response.setTeacherFirstName(entity.getEnrollment().getTeacher().getFirstName());
             response.setTeacherLastName(entity.getEnrollment().getTeacher().getLastName());
         }
-
         response.setStatus(entity.getStatus());
         response.setCreatedAt(entity.getCreatedAt());
         response.setUpdatedAt(entity.getUpdatedAt());
@@ -70,17 +72,13 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
     @Transactional(readOnly = true)
     public List<AttendanceResponse> findBySessionId(Long sessionId) {
         return attendanceRepository.findBySessionId(sessionId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<AttendanceResponse> findByEnrollmentId(Long enrollmentId) {
         return attendanceRepository.findAttendanceByEnrollmentOrdered(enrollmentId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional
@@ -128,8 +126,8 @@ public class AttendanceService extends GenericService<Attendance, AttendanceRequ
     @Transactional(readOnly = true)
     public Map<String, Long> getAttendanceStats(Long sessionId) {
         return Map.of(
-                "present", attendanceRepository.countBySessionIdAndStatus(sessionId, AttendanceStatus.PRESENT),
-                "absent",  attendanceRepository.countBySessionIdAndStatus(sessionId, AttendanceStatus.ABSENT)
+                "present", attendanceRepository.countPresentTeachersInSession(sessionId, AttendanceStatus.PRESENT),
+                "absent", attendanceRepository.countAbsentTeachersInSession(sessionId, AttendanceStatus.ABSENT)
         );
     }
 }

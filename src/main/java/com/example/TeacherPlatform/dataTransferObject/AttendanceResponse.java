@@ -8,11 +8,11 @@ import java.time.LocalDateTime;
 public class AttendanceResponse {
     private Long id;
     private Long sessionId;
-    private Integer sessionNumber;   // Important pentru ordonare
+    private Integer sessionNumber;
     private String sessionTopic;
     private Long enrollmentId;
-    private Long teacherId;          // Important pentru frontend
-    private String teacherFirstName; // Am spart numele în două ca să fie mai ușor de randat
+    private Long teacherId;
+    private String teacherFirstName;
     private String teacherLastName;
     private AttendanceStatus status;
     private LocalDateTime createdAt;

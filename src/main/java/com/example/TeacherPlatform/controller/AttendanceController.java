@@ -34,7 +34,6 @@ public class AttendanceController extends GenericController<Attendance, Attendan
         return ResponseEntity.ok(attendanceService.findBySessionId(sessionId));
     }
 
-    // Ruta pentru "pills" (matricea vizuală) a profesorului
     @GetMapping("/enrollment/{enrollmentId}")
     @PreAuthorize("hasAnyAuthority('PROFESOR', 'FORMATOR', 'ADMIN')")
     public ResponseEntity<List<AttendanceResponse>> getByEnrollment(@PathVariable Long enrollmentId) {
@@ -44,8 +43,7 @@ public class AttendanceController extends GenericController<Attendance, Attendan
     @PostMapping("/session/{sessionId}/save")
     @PreAuthorize("hasAnyAuthority('FORMATOR', 'ADMIN')")
     public ResponseEntity<List<AttendanceResponse>> saveBulk(
-            @PathVariable Long sessionId,
-            @Valid @RequestBody List<AttendanceRequest> requests) {
+            @PathVariable Long sessionId, @Valid @RequestBody List<AttendanceRequest> requests) {
         return ResponseEntity.ok(attendanceService.saveBulkAttendance(sessionId, requests));
     }
 

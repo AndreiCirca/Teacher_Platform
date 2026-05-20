@@ -41,11 +41,12 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, String>> resetPassword(@RequestBody Map<String, String> payload) {
-        return ResponseEntity.ok(Map.of("message", authService.resetPassword(payload.get("token"), payload.get("newPassword"))));
+        return ResponseEntity.ok(Map.of("message",
+                authService.resetPassword(payload.get("token"), payload.get("newPassword"))));
     }
 
     @PostMapping("/refresh")
-    @PreAuthorize("isAuthenticated()") // Poate fi chemată doar dacă au un token valid
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<AuthResponse> refreshToken(@RequestHeader("Authorization") String token) {
         return ResponseEntity.ok(authService.refreshToken(token));
     }
@@ -53,7 +54,6 @@ public class AuthController {
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, String>> logout() {
-        // Cu JWT (Stateless), logout-ul real se face ștergând token-ul pe Frontend.
         return ResponseEntity.ok(Map.of("message", "Delogare cu succes. Vă rugăm să ștergeți token-ul din client."));
     }
 }

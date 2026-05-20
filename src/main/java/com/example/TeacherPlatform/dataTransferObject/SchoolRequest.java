@@ -1,6 +1,8 @@
 package com.example.TeacherPlatform.dataTransferObject;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
@@ -13,7 +15,6 @@ public class SchoolRequest {
     private String county;
 
     private String taxId;
-
     private String address;
 
     @Email(message = "Invalid email address")

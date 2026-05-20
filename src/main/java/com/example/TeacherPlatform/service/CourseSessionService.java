@@ -5,12 +5,10 @@ import com.example.TeacherPlatform.dataTransferObject.CourseSessionResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
 import com.example.TeacherPlatform.model.Course;
 import com.example.TeacherPlatform.model.CourseSession;
-import com.example.TeacherPlatform.model.User;
 import com.example.TeacherPlatform.repository.BaseRepository;
 import com.example.TeacherPlatform.repository.CourseRepository;
 import com.example.TeacherPlatform.repository.CourseSessionRepository;
 import com.example.TeacherPlatform.repository.EnrollmentRepository;
-import com.example.TeacherPlatform.repository.UserRepository;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -18,9 +16,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.LocalDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 @Service
@@ -30,7 +26,6 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
     private final CourseSessionRepository courseSessionRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
-    private final UserRepository userRepository;
 
     @Override
     protected BaseRepository<CourseSession> getRepository() {
@@ -40,12 +35,12 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
     @Override
     @Transactional
     protected CourseSession toEntity(CourseSessionRequest request) {
-        CourseSession session = new CourseSession();
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + request.getCourseId()));
 
         validateTrainerAvailability(course.getTrainer().getId(), request.getStartTime(), request.getEndTime(), null);
 
+        CourseSession session = new CourseSession();
         session.setCourse(course);
         session.setTopic(request.getTopic());
         session.setStartTime(request.getStartTime());
@@ -65,9 +60,9 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
     @Transactional
     protected void updateEntity(CourseSession entity, CourseSessionRequest request) {
         if (entity.getCourse() != null && entity.getCourse().getTrainer() != null) {
-            validateTrainerAvailability(entity.getCourse().getTrainer().getId(), request.getStartTime(), request.getEndTime(), entity.getId());
+            validateTrainerAvailability(entity.getCourse().getTrainer().getId(),
+                    request.getStartTime(), request.getEndTime(), entity.getId());
         }
-
         entity.setTopic(request.getTopic());
         entity.setStartTime(request.getStartTime());
         entity.setEndTime(request.getEndTime());
@@ -79,12 +74,10 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
     protected CourseSessionResponse toResponse(CourseSession entity) {
         CourseSessionResponse response = new CourseSessionResponse();
         response.setId(entity.getId());
-
         if (entity.getCourse() != null) {
             response.setCourseId(entity.getCourse().getId());
             response.setCourseTitle(entity.getCourse().getTitle());
         }
-
         response.setTopic(entity.getTopic());
         response.setStartTime(entity.getStartTime());
         response.setEndTime(entity.getEndTime());
@@ -101,13 +94,11 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
         if (!courseRepository.existsById(courseId)) {
             throw new ResourceNotFoundException("Course not found with id: " + courseId);
         }
-
         if (authentication != null) {
             String username = authentication.getName();
             boolean isTeacher = authentication.getAuthorities().stream()
                     .map(GrantedAuthority::getAuthority)
                     .anyMatch(auth -> "PROFESOR".equals(auth));
-
             if (isTeacher) {
                 boolean hasAccess = enrollmentRepository.hasConfirmedOrCompletedEnrollment(courseId, username);
                 if (!hasAccess) {
@@ -115,45 +106,20 @@ public class CourseSessionService extends GenericService<CourseSession, CourseSe
                 }
             }
         }
-
-        // Am corectat numele metodei apelate din repository
         return courseSessionRepository.findByCourseIdOrdered(courseId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<CourseSessionResponse> findSessionsByTimeRange(LocalDateTime from, LocalDateTime to) {
         return courseSessionRepository.findSessionsByTimeRange(from, to)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<CourseSessionResponse> findUnmarkedAttendanceSessions() {
         return courseSessionRepository.findUnmarkedAttendanceSessions()
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseSessionResponse> findThisWeekSessions(Authentication authentication) {
-        User trainer = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("Formatorul nu a fost găsit"));
-
-        LocalDateTime startOfWeek = LocalDateTime.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).withHour(0).withMinute(0);
-        LocalDateTime endOfWeek = LocalDateTime.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).withHour(23).withMinute(59);
-
-        return courseSessionRepository.findSessionsByTimeRange(startOfWeek, endOfWeek)
-                .stream()
-                .filter(session -> session.getCourse() != null
-                        && session.getCourse().getTrainer() != null
-                        && session.getCourse().getTrainer().getId().equals(trainer.getId()))
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Override

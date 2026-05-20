@@ -17,6 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.List;
 
 @Configuration
@@ -35,33 +36,20 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Rute publice generale
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/schools/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
-
-                        // 2. Reguli specifice pentru Certificate
-                        .requestMatchers(HttpMethod.GET, "/api/certificates/verify/{code}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/certificates/verify/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/certificates/my").hasAuthority("PROFESOR")
                         .requestMatchers("/api/certificates/**").hasAuthority("ADMIN")
-
-                        // 3. Reguli specifice pentru CourseMaterial
-                        .requestMatchers(HttpMethod.GET, "/api/materials/course/{courseId}").hasAnyAuthority("PROFESOR", "FORMATOR", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/materials/{id}/download").hasAnyAuthority("PROFESOR", "FORMATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/materials/course/**").hasAnyAuthority("PROFESOR", "FORMATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/materials/*/download").hasAnyAuthority("PROFESOR", "FORMATOR", "ADMIN")
                         .requestMatchers("/api/materials/**").hasAnyAuthority("FORMATOR", "ADMIN")
-
-                        // 4. Reguli pentru celelalte entități existente
                         .requestMatchers("/api/schools/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/users/me").authenticated()
                         .requestMatchers("/api/users/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/categories/**").hasAuthority("ADMIN")
                         .requestMatchers("/api/courses/**").hasAnyAuthority("ADMIN", "FORMATOR")
-
-                        // 5. Reguli Notificări
-                        .requestMatchers("/api/notifications/my/**").authenticated()
-                        .requestMatchers("/api/notifications/**").hasAnyAuthority("ADMIN", "FORMATOR", "PROFESOR")
-
-                        // Orice alt request neverificat mai sus cere autentificare generică
+                        .requestMatchers("/api/notifications/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -72,18 +60,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173"
         ));
-
-        config.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
-        ));
-        config.setAllowedHeaders(List.of(
-                "Authorization", "Content-Type", "Accept"
-        ));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         config.setExposedHeaders(List.of("Authorization"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
@@ -99,8 +81,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 }

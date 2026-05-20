@@ -17,8 +17,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
@@ -50,18 +48,15 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
     protected EnrollmentResponse toResponse(Enrollment entity) {
         EnrollmentResponse response = new EnrollmentResponse();
         response.setId(entity.getId());
-
         if (entity.getCourse() != null) {
             response.setCourseId(entity.getCourse().getId());
             response.setCourseTitle(entity.getCourse().getTitle());
         }
-
         if (entity.getTeacher() != null) {
             response.setTeacherId(entity.getTeacher().getId());
             response.setTeacherFirstName(entity.getTeacher().getFirstName());
             response.setTeacherLastName(entity.getTeacher().getLastName());
         }
-
         response.setStatus(entity.getStatus());
         response.setCertificateGenerated(entity.getCertificateGenerated());
         response.setCreatedAt(entity.getCreatedAt());
@@ -70,10 +65,6 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
 
     @Override
     protected void updateEntity(Enrollment entity, EnrollmentRequest request) {}
-
-    // ----------------------------------------------------------------------------------
-    // Funcționalități PROFESOR
-    // ----------------------------------------------------------------------------------
 
     @Transactional
     public EnrollmentResponse createEnrollment(EnrollmentRequest request, Authentication authentication) {
@@ -92,8 +83,11 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
         Enrollment enrollment = new Enrollment();
         enrollment.setTeacher(teacher);
         enrollment.setCourse(course);
-        enrollment.setStatus(EnrollmentStatus.PENDING);
+        enrollment.setStatus(EnrollmentStatus.CONFIRMED);
         enrollment.setCertificateGenerated(false);
+
+        course.setCurrentEnrolled(course.getCurrentEnrolled() + 1);
+        courseRepository.save(course);
 
         return toResponse(enrollmentRepository.save(enrollment));
     }
@@ -101,32 +95,28 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getMyEnrollments(Authentication authentication) {
         User teacher = getUserByEmail(authentication.getName());
-        return enrollmentRepository.findByTeacherId(teacher.getId()).stream().map(this::toResponse).toList();
+        return enrollmentRepository.findByTeacherId(teacher.getId())
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getMyActiveEnrollments(Authentication authentication) {
         User teacher = getUserByEmail(authentication.getName());
-        return enrollmentRepository.findConfirmedEnrollmentsByTeacher(teacher.getId()).stream().map(this::toResponse).toList();
+        return enrollmentRepository.findConfirmedEnrollmentsByTeacher(teacher.getId())
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getMyCompletedEnrollments(Authentication authentication) {
         User teacher = getUserByEmail(authentication.getName());
-        return enrollmentRepository.findByTeacherAndStatus(teacher.getId(), EnrollmentStatus.COMPLETED).stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public boolean checkEnrollment(Long courseId, Authentication authentication) {
-        User teacher = getUserByEmail(authentication.getName());
-        return enrollmentRepository.findByCourseIdAndTeacherId(courseId, teacher.getId()).isPresent();
+        return enrollmentRepository.findByTeacherAndStatus(teacher.getId(), EnrollmentStatus.COMPLETED)
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional
     public void cancelEnrollment(Long enrollmentId, Authentication authentication) {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
-
         User teacher = getUserByEmail(authentication.getName());
         if (!enrollment.getTeacher().getId().equals(teacher.getId())) {
             throw new RuntimeException("Access Denied.");
@@ -134,15 +124,10 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
         processCancellation(enrollment);
     }
 
-    // ----------------------------------------------------------------------------------
-    // Funcționalități FORMATOR
-    // ----------------------------------------------------------------------------------
-
     @Transactional
     public void cancelEnrollmentAsTrainer(Long enrollmentId, Authentication authentication) {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
-
         User trainer = getUserByEmail(authentication.getName());
         if (!enrollment.getCourse().getTrainer().getId().equals(trainer.getId())) {
             throw new RuntimeException("Access Denied. You are not the trainer for this course.");
@@ -171,31 +156,6 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
         return toResponse(enrollmentRepository.save(enrollment));
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Long> getCourseEnrollmentStats(Long courseId) {
-        List<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId);
-
-        long total = enrollments.size();
-        long confirmed = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.CONFIRMED).count();
-        long pending = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.PENDING).count();
-        long cancelled = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.CANCELLED).count();
-
-        return Map.of("total", total, "confirmed", confirmed, "pending", pending, "cancelled", cancelled);
-    }
-
-    // ----------------------------------------------------------------------------------
-    // Funcționalități ADMIN
-    // ----------------------------------------------------------------------------------
-
-    @Transactional(readOnly = true)
-    public List<EnrollmentResponse> getEnrollmentsThisMonth() {
-        LocalDateTime startOfMonth = YearMonth.now().atDay(1).atStartOfDay();
-        return enrollmentRepository.findAll().stream()
-                .filter(e -> e.getCreatedAt() != null && e.getCreatedAt().isAfter(startOfMonth))
-                .map(this::toResponse)
-                .toList();
-    }
-
     @Transactional
     public EnrollmentResponse completeEnrollment(Long enrollmentId) {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
@@ -211,17 +171,25 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getEnrollmentsByCourse(Long courseId) {
-        return enrollmentRepository.findByCourseId(courseId).stream().map(this::toResponse).toList();
+        return enrollmentRepository.findByCourseId(courseId)
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getPendingEnrollments() {
-        return enrollmentRepository.findPendingEnrollments().stream().map(this::toResponse).toList();
+        return enrollmentRepository.findPendingEnrollments()
+                .stream().map(this::toResponse).toList();
     }
 
-    // ----------------------------------------------------------------------------------
-    // Helpers
-    // ----------------------------------------------------------------------------------
+    @Transactional(readOnly = true)
+    public Map<String, Long> getCourseEnrollmentStats(Long courseId) {
+        List<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId);
+        long total = enrollments.size();
+        long confirmed = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.CONFIRMED).count();
+        long pending = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.PENDING).count();
+        long cancelled = enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.CANCELLED).count();
+        return Map.of("total", total, "confirmed", confirmed, "pending", pending, "cancelled", cancelled);
+    }
 
     private void processCancellation(Enrollment enrollment) {
         if (enrollment.getStatus() == EnrollmentStatus.CONFIRMED) {

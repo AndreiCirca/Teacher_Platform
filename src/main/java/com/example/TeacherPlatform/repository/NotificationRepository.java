@@ -17,9 +17,6 @@ public interface NotificationRepository extends BaseRepository<Notification> {
     @Query("SELECT n FROM Notification n WHERE n.user.id = :userId AND n.read = false ORDER BY n.createdAt DESC")
     List<Notification> findUnreadNotificationsByUser(@Param("userId") Long userId);
 
-    @Query("SELECT n FROM Notification n WHERE n.user.id = :userId ORDER BY n.createdAt DESC LIMIT 10")
-    List<Notification> findRecentNotificationsByUser(@Param("userId") Long userId);
-
     List<Notification> findByType(NotificationType type);
 
     @Query("SELECT COUNT(n) FROM Notification n WHERE n.user.id = :userId AND n.read = false")

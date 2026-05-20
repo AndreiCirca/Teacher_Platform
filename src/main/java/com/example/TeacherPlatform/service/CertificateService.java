@@ -3,7 +3,10 @@ package com.example.TeacherPlatform.service;
 import com.example.TeacherPlatform.dataTransferObject.CertificateRequest;
 import com.example.TeacherPlatform.dataTransferObject.CertificateResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
-import com.example.TeacherPlatform.model.*;
+import com.example.TeacherPlatform.model.Certificate;
+import com.example.TeacherPlatform.model.Course;
+import com.example.TeacherPlatform.model.Enrollment;
+import com.example.TeacherPlatform.model.enums.AttendanceStatus;
 import com.example.TeacherPlatform.model.enums.CertificateStatus;
 import com.example.TeacherPlatform.model.enums.EnrollmentStatus;
 import com.example.TeacherPlatform.repository.*;
@@ -26,7 +29,6 @@ public class CertificateService extends GenericService<Certificate, CertificateR
     private final CourseRepository courseRepository;
     private final CourseSessionRepository courseSessionRepository;
     private final AttendanceRepository attendanceRepository;
-
     private final int minAttendancePercentage;
 
     public CertificateService(
@@ -36,7 +38,6 @@ public class CertificateService extends GenericService<Certificate, CertificateR
             CourseSessionRepository courseSessionRepository,
             AttendanceRepository attendanceRepository,
             @Value("${app.certificates.min-attendance-percentage:75}") int minAttendancePercentage) {
-
         this.certificateRepository = certificateRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.courseRepository = courseRepository;
@@ -76,17 +77,16 @@ public class CertificateService extends GenericService<Certificate, CertificateR
     protected CertificateResponse toResponse(Certificate entity) {
         CertificateResponse response = new CertificateResponse();
         response.setId(entity.getId());
-
         if (entity.getEnrollment() != null) {
             response.setEnrollmentId(entity.getEnrollment().getId());
             if (entity.getEnrollment().getTeacher() != null) {
-                response.setTeacherFullName(entity.getEnrollment().getTeacher().getFirstName() + " " + entity.getEnrollment().getTeacher().getLastName());
+                response.setTeacherFullName(entity.getEnrollment().getTeacher().getFirstName()
+                        + " " + entity.getEnrollment().getTeacher().getLastName());
             }
             if (entity.getEnrollment().getCourse() != null) {
                 response.setCourseTitle(entity.getEnrollment().getCourse().getTitle());
             }
         }
-
         response.setCertificateCode(entity.getCertificateCode());
         response.setIssuedDate(entity.getIssuedDate());
         response.setStatus(entity.getStatus());
@@ -109,9 +109,7 @@ public class CertificateService extends GenericService<Certificate, CertificateR
     @Transactional(readOnly = true)
     public List<CertificateResponse> findMyCertificates(Long teacherId) {
         return certificateRepository.findCertificatesByTeacher(teacherId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -146,25 +144,22 @@ public class CertificateService extends GenericService<Certificate, CertificateR
             enrollment.setStatus(EnrollmentStatus.COMPLETED);
             enrollmentRepository.save(enrollment);
 
-            long presentSessions = attendanceRepository.countPresentSessionsByEnrollment(enrollment.getId());
+            long presentSessions = attendanceRepository.countPresentSessionsByEnrollment(
+                    enrollment.getId(), AttendanceStatus.PRESENT);
             double attendancePercentage = ((double) presentSessions / totalSessions) * 100;
 
             if (attendancePercentage >= minAttendancePercentage) {
-                boolean alreadyHasCertificate = certificateRepository.findCertificatesByTeacher(enrollment.getTeacher().getId())
+                boolean alreadyHas = certificateRepository.findCertificatesByTeacher(enrollment.getTeacher().getId())
                         .stream().anyMatch(c -> c.getEnrollment().getId().equals(enrollment.getId()));
-
-                if (!alreadyHasCertificate) {
+                if (!alreadyHas) {
                     Certificate certificate = new Certificate();
                     certificate.setEnrollment(enrollment);
-
                     String uniqueSuffix = UUID.randomUUID().toString().substring(0, 5).toUpperCase();
                     String generatedCode = "FORM-" + LocalDate.now().getYear() + "-" + uniqueSuffix;
-
                     certificate.setCertificateCode(generatedCode);
                     certificate.setIssuedDate(LocalDate.now());
                     certificate.setStatus(CertificateStatus.ACTIVE);
                     certificate.setCertificateUrl("certificates/" + generatedCode + ".pdf");
-
                     generatedCertificates.add(certificateRepository.save(certificate));
                 }
             }
@@ -177,7 +172,6 @@ public class CertificateService extends GenericService<Certificate, CertificateR
     public CertificateResponse downloadCertificate(Long id, String email) {
         Certificate certificate = certificateRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Certificate not found with id: " + id));
-
         if (!certificate.getEnrollment().getTeacher().getEmail().equals(email)) {
             throw new RuntimeException("Access Denied. You can only download your own certificates.");
         }
@@ -186,11 +180,11 @@ public class CertificateService extends GenericService<Certificate, CertificateR
 
     @Transactional(readOnly = true)
     public Map<String, Long> getCertificateStats() {
-        long total = certificateRepository.count();
-        long active = certificateRepository.countByStatus(CertificateStatus.ACTIVE);
-        long revoked = certificateRepository.countByStatus(CertificateStatus.REVOKED);
-        long pending = certificateRepository.countByStatus(CertificateStatus.PENDING);
-
-        return Map.of("total", total, "active", active, "revoked", revoked, "pending", pending);
+        return Map.of(
+                "total", certificateRepository.count(),
+                "active", certificateRepository.countByStatus(CertificateStatus.ACTIVE),
+                "revoked", certificateRepository.countByStatus(CertificateStatus.REVOKED),
+                "pending", certificateRepository.countByStatus(CertificateStatus.PENDING)
+        );
     }
 }

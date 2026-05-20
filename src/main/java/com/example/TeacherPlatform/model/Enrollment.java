@@ -1,4 +1,3 @@
-// com/example/TeacherPlatform/model/Enrollment.java
 package com.example.TeacherPlatform.model;
 
 import com.example.TeacherPlatform.model.enums.EnrollmentStatus;
@@ -8,7 +7,9 @@ import lombok.*;
 @Entity
 @Table(name = "enrollments",
         uniqueConstraints = @UniqueConstraint(columnNames = {"teacher_id", "course_id"}))
-@Getter @Setter @NoArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
 public class Enrollment extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)

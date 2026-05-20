@@ -28,10 +28,6 @@ public class UserController extends GenericController<User, UserRequest, UserRes
         return userService;
     }
 
-    // -------------------------------------------------------------------------
-    // Profilul Utilizatorului Curent (orice rol)
-    // -------------------------------------------------------------------------
-
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<UserResponse> getMyProfile(Authentication authentication) {
@@ -54,14 +50,8 @@ public class UserController extends GenericController<User, UserRequest, UserRes
     @PostMapping("/me/avatar")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<UserResponse> updateMyAvatar(@RequestBody Map<String, String> payload, Authentication authentication) {
-        // În viața reală aici primești un MultipartFile, îl urci în Supabase Storage și primești URL-ul.
-        // Pentru API Contract, acceptăm direct URL-ul în format JSON: {"avatarUrl": "https://..."}
         return ResponseEntity.ok(userService.updateMyAvatar(payload.get("avatarUrl"), authentication));
     }
-
-    // -------------------------------------------------------------------------
-    // Funcționalități ADMIN
-    // -------------------------------------------------------------------------
 
     @PutMapping("/{id}/toggle-active")
     @PreAuthorize("hasAuthority('ADMIN')")
@@ -81,35 +71,23 @@ public class UserController extends GenericController<User, UserRequest, UserRes
         return ResponseEntity.ok(userService.getUserStats());
     }
 
-    // Blocăm rutele standard CRUD doar pentru ADMIN (ele moștenesc altfel permisiunile lipsă)
+    @Override
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<List<UserResponse>> getAll() { return super.getAll(); }
 
     @Override
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<List<UserResponse>> getAll() {
-        return super.getAll();
-    }
+    public ResponseEntity<UserResponse> getById(@PathVariable Long id) { return super.getById(id); }
 
     @Override
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
-        return super.getById(id);
-    }
+    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) { return super.create(request); }
 
     @Override
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
-        return super.create(request);
-    }
+    public ResponseEntity<UserResponse> update(@PathVariable Long id, @Valid @RequestBody UserRequest request) { return super.update(id, request); }
 
     @Override
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<UserResponse> update(@PathVariable Long id, @Valid @RequestBody UserRequest request) {
-        return super.update(id, request);
-    }
-
-    @Override
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        return super.delete(id);
-    }
+    public ResponseEntity<Void> delete(@PathVariable Long id) { return super.delete(id); }
 }

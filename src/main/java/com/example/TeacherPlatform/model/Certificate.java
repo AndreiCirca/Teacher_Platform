@@ -3,7 +3,6 @@ package com.example.TeacherPlatform.model;
 import com.example.TeacherPlatform.model.enums.CertificateStatus;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDate;
 
 @Entity
@@ -13,21 +12,20 @@ import java.time.LocalDate;
 @Getter
 @Setter
 public class Certificate extends BaseEntity {
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "enrollment_id", nullable = false)
     private Enrollment enrollment;
-    
+
     @Column(nullable = false, unique = true)
     private String certificateCode;
-    
+
     @Column(nullable = false)
     private LocalDate issuedDate;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private CertificateStatus status = CertificateStatus.ACTIVE;
-    
+
     private String certificateUrl;
 }
-

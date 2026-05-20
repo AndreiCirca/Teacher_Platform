@@ -1,6 +1,5 @@
 package com.example.TeacherPlatform.dataTransferObject;
 
-
 import com.example.TeacherPlatform.model.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

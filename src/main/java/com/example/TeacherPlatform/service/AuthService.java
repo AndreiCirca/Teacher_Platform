@@ -43,7 +43,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(request.getRole());
         user.setActive(true);
-        user.setEmailVerified(false); // Conform cerințelor, implicit e false
+        user.setEmailVerified(false);
 
         if (request.getSchoolId() != null) {
             School school = schoolRepository.findById(request.getSchoolId())
@@ -57,11 +57,10 @@ public class AuthService {
             schoolService.incrementTeacherCount(savedUser.getSchool().getId());
         }
 
-        log.info("S-a trimis email de verificare către: " + savedUser.getEmail());
-
+        log.info("S-a trimis email de verificare către: {}", savedUser.getEmail());
         String token = jwtUtil.generateToken(savedUser.getEmail(), savedUser.getRole().name());
-        return new AuthResponse(token, savedUser.getEmail(),
-                savedUser.getRole().name(), savedUser.getFirstName(), savedUser.getLastName());
+        return new AuthResponse(token, savedUser.getEmail(), savedUser.getRole().name(),
+                savedUser.getFirstName(), savedUser.getLastName());
     }
 
     public AuthResponse login(AuthRequest request) {
@@ -77,21 +76,18 @@ public class AuthService {
                         request.getEmail().toLowerCase(), request.getPassword()));
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getEmail(),
-                user.getRole().name(), user.getFirstName(), user.getLastName());
+        return new AuthResponse(token, user.getEmail(), user.getRole().name(),
+                user.getFirstName(), user.getLastName());
     }
 
     @Transactional
     public String verifyEmail(String token) {
-        // În producție, token-ul e validat. Pentru MVP, simulăm că token = emailul encodat sau un identificator
-        // Presupunem că JWT Util poate extrage email-ul dintr-un token valid de înregistrare
         if (!jwtUtil.isTokenValid(token)) {
             throw new RuntimeException("Token de verificare invalid sau expirat.");
         }
         String email = jwtUtil.extractEmail(token);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilizatorul nu a fost găsit."));
-
         user.setEmailVerified(true);
         userRepository.save(user);
         return "Email verificat cu succes. Contul este acum activat complet.";
@@ -100,11 +96,8 @@ public class AuthService {
     public String forgotPassword(String email) {
         User user = userRepository.findByEmail(email.toLowerCase())
                 .orElseThrow(() -> new ResourceNotFoundException("Nu există niciun cont asociat cu acest email."));
-
-        // Generăm un token temporar (aici folosim JWT-ul nostru ca token de resetare)
         String resetToken = jwtUtil.generateToken(user.getEmail(), "RESET_PASSWORD");
-        log.info("S-a trimis email de resetare parolă către: " + email + ". Token: " + resetToken);
-
+        log.info("S-a trimis email de resetare parolă către: {}. Token: {}", email, resetToken);
         return "Un email cu instrucțiuni pentru resetarea parolei a fost trimis.";
     }
 
@@ -116,7 +109,6 @@ public class AuthService {
         String email = jwtUtil.extractEmail(token);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilizatorul nu a fost găsit."));
-
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         return "Parola a fost resetată cu succes.";
@@ -126,16 +118,14 @@ public class AuthService {
         if (oldToken != null && oldToken.startsWith("Bearer ")) {
             oldToken = oldToken.substring(7);
         }
-
         if (!jwtUtil.isTokenValid(oldToken)) {
             throw new RuntimeException("Token invalid. Nu se poate face refresh.");
         }
-
         String email = jwtUtil.extractEmail(oldToken);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilizatorul nu a fost găsit."));
-
         String newToken = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(newToken, user.getEmail(), user.getRole().name(), user.getFirstName(), user.getLastName());
+        return new AuthResponse(newToken, user.getEmail(), user.getRole().name(),
+                user.getFirstName(), user.getLastName());
     }
 }

@@ -16,4 +16,3 @@ public class AttendanceRequest {
     @NotNull(message = "Attendance status is required")
     private AttendanceStatus status;
 }
-

@@ -31,7 +31,7 @@ public class SchoolService extends GenericService<School, SchoolRequest, SchoolR
         School school = new School();
         school.setName(request.getName().trim());
         school.setCounty(request.getCounty().trim());
-        school.setAddress(request.getAddress().trim());
+        school.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
         school.setTaxId(request.getTaxId() != null ? request.getTaxId().trim() : null);
         school.setDirectorEmail(request.getDirectorEmail() != null ? request.getDirectorEmail().trim() : null);
         school.setTeacherCount(0);
@@ -57,7 +57,7 @@ public class SchoolService extends GenericService<School, SchoolRequest, SchoolR
     protected void updateEntity(School school, SchoolRequest request) {
         school.setName(request.getName().trim());
         school.setCounty(request.getCounty().trim());
-        school.setAddress(request.getAddress().trim());
+        school.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
         school.setTaxId(request.getTaxId() != null ? request.getTaxId().trim() : null);
         school.setDirectorEmail(request.getDirectorEmail() != null ? request.getDirectorEmail().trim() : null);
     }
@@ -77,20 +77,17 @@ public class SchoolService extends GenericService<School, SchoolRequest, SchoolR
     @Override
     @Transactional
     public SchoolResponse update(Long id, SchoolRequest request) {
-        schoolRepository.findByName(request.getName().trim())
-                .ifPresent(existing -> {
-                    if (!existing.getId().equals(id)) {
-                        throw new RuntimeException("A school with this name already exists");
-                    }
-                });
-
+        schoolRepository.findByName(request.getName().trim()).ifPresent(existing -> {
+            if (!existing.getId().equals(id)) {
+                throw new RuntimeException("A school with this name already exists");
+            }
+        });
         if (request.getTaxId() != null) {
-            schoolRepository.findByTaxId(request.getTaxId().trim())
-                    .ifPresent(existing -> {
-                        if (!existing.getId().equals(id)) {
-                            throw new RuntimeException("The Tax ID is already used by another school");
-                        }
-                    });
+            schoolRepository.findByTaxId(request.getTaxId().trim()).ifPresent(existing -> {
+                if (!existing.getId().equals(id)) {
+                    throw new RuntimeException("The Tax ID is already used by another school");
+                }
+            });
         }
         return super.update(id, request);
     }
@@ -101,9 +98,7 @@ public class SchoolService extends GenericService<School, SchoolRequest, SchoolR
         if (!schoolRepository.existsById(id)) {
             throw new ResourceNotFoundException("School not found with id: " + id);
         }
-
         long activeTeachers = userRepository.countBySchoolIdAndActiveTrue(id);
-
         if (activeTeachers > 0) {
             throw new RuntimeException("Cannot delete a school that has " + activeTeachers + " active teachers.");
         }
@@ -113,18 +108,13 @@ public class SchoolService extends GenericService<School, SchoolRequest, SchoolR
     @Transactional(readOnly = true)
     public List<SchoolResponse> findByCounty(String county) {
         return schoolRepository.findByCountyOrderByName(county.trim())
-                .stream()
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<SchoolResponse> searchByName(String name) {
-        // CORECȚIE: Trim pe parametru pentru a evita comportamente ciudate cauzate de spații libere accidentale
         return schoolRepository.findByNameContainingIgnoreCase(name.trim())
-                .stream()
-                .map(this::toResponse)
-                .toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional

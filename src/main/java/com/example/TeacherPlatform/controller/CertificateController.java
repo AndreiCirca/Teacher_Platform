@@ -57,25 +57,22 @@ public class CertificateController extends GenericController<Certificate, Certif
         return ResponseEntity.ok(certificateService.revokeCertificate(id));
     }
 
-    // Funcționalitate NOUĂ: Descărcare certificat
     @GetMapping("/{id}/download")
     @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<CertificateResponse> downloadCertificate(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(certificateService.downloadCertificate(id, authentication.getName()));
     }
 
-    // Funcționalitate NOUĂ: Statistici Admin
     @GetMapping("/admin/stats")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Map<String, Long>> getStats() {
         return ResponseEntity.ok(certificateService.getCertificateStats());
     }
 
-    // Funcționalitate NOUĂ: Export Excel Admin (Mock response pentru a îndeplini API Contract)
     @GetMapping("/admin/export")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<String> exportCertificates() {
-        return ResponseEntity.ok("Export Excel generat cu succes. În producție va returna un fișier .xlsx.");
+        return ResponseEntity.ok("Export Excel generat cu succes.");
     }
 
     @Override

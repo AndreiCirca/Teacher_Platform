@@ -1,19 +1,19 @@
 package com.example.TeacherPlatform.dataTransferObject;
 
 import com.example.TeacherPlatform.model.enums.CourseStatus;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.time.LocalDate;
 
 @Data
 public class CourseRequest {
+
     @NotBlank(message = "Course title is required")
     private String title;
 
     private String description;
-
-    @NotNull(message = "Category ID is required")
-    private Long categoryId;
 
     @NotNull(message = "Trainer ID is required")
     private Long trainerId;

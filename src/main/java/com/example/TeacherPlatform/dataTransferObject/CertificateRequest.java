@@ -8,6 +8,7 @@ import java.time.LocalDate;
 
 @Data
 public class CertificateRequest {
+
     @NotNull(message = "Enrollment ID is required")
     private Long enrollmentId;
 
@@ -18,6 +19,5 @@ public class CertificateRequest {
     private LocalDate issuedDate;
 
     private CertificateStatus status = CertificateStatus.ACTIVE;
-
     private String certificateUrl;
 }

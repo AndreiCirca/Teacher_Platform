@@ -8,6 +8,7 @@ import lombok.Data;
 
 @Data
 public class UserRequest {
+
     @NotBlank(message = "First name is required")
     private String firstName;
 
@@ -25,12 +26,8 @@ public class UserRequest {
     private UserRole role;
 
     private Long schoolId;
-
     private Boolean active = true;
-
     private Boolean emailVerified = false;
-
     private String phoneNumber;
-
     private String avatarUrl;
 }
