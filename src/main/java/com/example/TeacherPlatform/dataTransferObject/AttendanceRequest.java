@@ -6,6 +6,7 @@ import lombok.Data;
 
 @Data
 public class AttendanceRequest {
+
     @NotNull(message = "Session ID is required")
     private Long sessionId;
 
@@ -13,5 +14,6 @@ public class AttendanceRequest {
     private Long enrollmentId;
 
     @NotNull(message = "Attendance status is required")
-    private AttendanceStatus status = AttendanceStatus.NOT_MARKED;
+    private AttendanceStatus status;
 }
+
