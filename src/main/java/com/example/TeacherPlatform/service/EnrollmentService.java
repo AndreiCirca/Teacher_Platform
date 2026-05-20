@@ -85,10 +85,6 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
             throw new RuntimeException("Ești deja înscris la acest curs.");
         }
 
-        if (course.getCurrentEnrolled() >= course.getMaxParticipants()) {
-            throw new RuntimeException("Acest curs și-a atins capacitatea maximă.");
-        }
-
         Enrollment enrollment = new Enrollment();
         enrollment.setTeacher(teacher);
         enrollment.setCourse(course);
@@ -160,9 +156,6 @@ public class EnrollmentService extends GenericService<Enrollment, EnrollmentRequ
         }
 
         Course course = enrollment.getCourse();
-        if (course.getCurrentEnrolled() >= course.getMaxParticipants()) {
-            throw new RuntimeException("Cursul este deja plin.");
-        }
 
         enrollment.setStatus(EnrollmentStatus.CONFIRMED);
         course.setCurrentEnrolled(course.getCurrentEnrolled() + 1);
