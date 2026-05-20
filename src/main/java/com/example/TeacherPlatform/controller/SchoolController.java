@@ -41,18 +41,6 @@ public class SchoolController extends GenericController<School, SchoolRequest, S
         return ResponseEntity.ok(schoolService.searchByName(name));
     }
 
-    // POST /api/schools/import — Import bulk din Excel
-    @PostMapping("/import")
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<Map<String, String>> importSchoolsFromExcel() {
-        // În viața reală aici ai primi un @RequestParam("file") MultipartFile file
-        // și l-ai parsa cu Apache POI. Conform contractului, trimitem un răspuns mock.
-        return ResponseEntity.ok(Map.of(
-                "message", "Fișierul Excel a fost procesat. Școlile au fost importate cu succes.",
-                "status", "SUCCESS"
-        ));
-    }
-
     @Override
     @PreAuthorize("hasAnyAuthority('ADMIN')")
     public ResponseEntity<SchoolResponse> create(@Valid @RequestBody SchoolRequest request) {
