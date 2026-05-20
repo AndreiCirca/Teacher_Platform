@@ -33,29 +33,9 @@ public class CourseController extends GenericController<Course, CourseRequest, C
     // Rute Publice (Acesibile fără autentificare / tuturor)
     // ----------------------------------------------------------------------------------
 
-    @Override
-    public ResponseEntity<List<CourseResponse>> getAll() {
-        return ResponseEntity.ok(courseService.findAvailableCourses());
-    }
-
-    @GetMapping("/available")
-    public ResponseEntity<List<CourseResponse>> getAvailable() {
-        return ResponseEntity.ok(courseService.findAvailableCourses());
-    }
-
     @GetMapping("/upcoming")
     public ResponseEntity<List<CourseResponse>> getUpcoming() {
         return ResponseEntity.ok(courseService.findUpcomingCourses());
-    }
-
-    @GetMapping("/popular")
-    public ResponseEntity<List<CourseResponse>> getPopular() {
-        return ResponseEntity.ok(courseService.findPopularCourses());
-    }
-
-    @GetMapping("/category/{categoryId}")
-    public ResponseEntity<List<CourseResponse>> getByCategory(@PathVariable Long categoryId) {
-        return ResponseEntity.ok(courseService.findByCategoryId(categoryId));
     }
 
     // ----------------------------------------------------------------------------------
@@ -98,23 +78,6 @@ public class CourseController extends GenericController<Course, CourseRequest, C
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
     }
 
-    // Metoda reală pentru update
-    @PutMapping("/{id}/edit")
-    @PreAuthorize("hasAuthority('FORMATOR')")
-    public ResponseEntity<CourseResponse> updateCourseAsTrainer(
-            @PathVariable Long id,
-            @Valid @RequestBody CourseRequest request,
-            Authentication authentication) {
-        return ResponseEntity.ok(courseService.updateCourseAsTrainer(id, request, authentication));
-    }
-
-    @PutMapping("/{id}/cancel")
-    @PreAuthorize("hasAuthority('FORMATOR')")
-    public ResponseEntity<Void> cancelCourseAsTrainer(@PathVariable Long id, Authentication authentication) {
-        courseService.cancelCourseAsTrainer(id, authentication);
-        return ResponseEntity.noContent().build();
-    }
-
     // ----------------------------------------------------------------------------------
     // Rute ADMIN
     // ----------------------------------------------------------------------------------
@@ -123,31 +86,6 @@ public class CourseController extends GenericController<Course, CourseRequest, C
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<CourseResponse>> getAllForAdmin() {
         return ResponseEntity.ok(courseService.findAll());
-    }
-
-    @GetMapping("/pending")
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<List<CourseResponse>> getPendingApproval() {
-        return ResponseEntity.ok(courseService.findPendingApprovalCourses());
-    }
-
-    @PutMapping("/{id}/approve")
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<CourseResponse> approveCourse(@PathVariable Long id) {
-        return ResponseEntity.ok(courseService.approveCourse(id));
-    }
-
-    @PutMapping("/{id}/reject")
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<CourseResponse> rejectCourse(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        String reason = payload.get("reason");
-        return ResponseEntity.ok(courseService.rejectCourse(id, reason));
-    }
-
-    @PutMapping("/{id}/complete")
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<CourseResponse> completeCourse(@PathVariable Long id) {
-        return ResponseEntity.ok(courseService.markAsCompleted(id));
     }
 
     @Override
