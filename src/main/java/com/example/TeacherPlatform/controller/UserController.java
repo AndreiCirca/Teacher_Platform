@@ -1,6 +1,7 @@
 package com.example.TeacherPlatform.controller;
 
 import com.example.TeacherPlatform.controller.generic.GenericController;
+import com.example.TeacherPlatform.dataTransferObject.PasswordResetRequestResponse;
 import com.example.TeacherPlatform.dataTransferObject.UserRequest;
 import com.example.TeacherPlatform.dataTransferObject.UserResponse;
 import com.example.TeacherPlatform.model.User;
@@ -57,6 +58,32 @@ public class UserController extends GenericController<User, UserRequest, UserRes
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<UserResponse> toggleActiveStatus(@PathVariable Long id) {
         return ResponseEntity.ok(userService.toggleActiveStatus(id));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@RequestBody Map<String, String> payload) {
+        userService.createResetRequest(payload.get("email"));
+        return ResponseEntity.noContent().build(); // always 204 — don't reveal if email exists
+    }
+
+    @GetMapping("/reset-requests")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<List<PasswordResetRequestResponse>> getPendingResetRequests() {
+        return ResponseEntity.ok(userService.getPendingResetRequests());
+    }
+
+    @PutMapping("/reset-requests/{id}/resolve")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Void> resolveResetRequest(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        userService.resolveResetRequest(id, payload.get("newPassword"));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/reset-password")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Void> resetPassword(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        userService.resetPassword(id, payload.get("newPassword"));
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/unverified")

@@ -4,6 +4,7 @@ import com.example.TeacherPlatform.controller.generic.GenericController;
 import com.example.TeacherPlatform.dataTransferObject.CourseRequest;
 import com.example.TeacherPlatform.dataTransferObject.CourseResponse;
 import com.example.TeacherPlatform.model.Course;
+import com.example.TeacherPlatform.model.enums.CourseStatus;
 import com.example.TeacherPlatform.service.CourseService;
 import com.example.TeacherPlatform.service.generic.GenericService;
 import jakarta.validation.Valid;
@@ -67,6 +68,7 @@ public class CourseController extends GenericController<Course, CourseRequest, C
     @PreAuthorize("hasAuthority('FORMATOR')")
     public ResponseEntity<CourseResponse> createCourseAsTrainer(
             @Valid @RequestBody CourseRequest request, Authentication authentication) {
+        request.setStatus(CourseStatus.PENDING_APPROVAL);
         return ResponseEntity.status(HttpStatus.CREATED).body(courseService.create(request));
     }
 
@@ -94,6 +96,13 @@ public class CourseController extends GenericController<Course, CourseRequest, C
     @PreAuthorize("hasAuthority('FORMATOR')")
     public ResponseEntity<Void> cancelCourseAsTrainer(@PathVariable Long id, Authentication authentication) {
         courseService.cancelCourseAsTrainer(id, authentication);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/my")
+    @PreAuthorize("hasAuthority('FORMATOR')")
+    public ResponseEntity<Void> deleteOwnCourse(@PathVariable Long id, Authentication authentication) {
+        courseService.deleteOwnCourse(id, authentication);
         return ResponseEntity.noContent().build();
     }
 

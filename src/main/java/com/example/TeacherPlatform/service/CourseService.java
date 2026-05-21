@@ -140,6 +140,20 @@ public class CourseService extends GenericService<Course, CourseRequest, CourseR
     }
 
     @Transactional
+    public void deleteOwnCourse(Long id, Authentication authentication) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+        User trainer = getUserByEmail(authentication.getName());
+        if (!course.getTrainer().getId().equals(trainer.getId())) {
+            throw new RuntimeException("Access Denied.");
+        }
+        if (course.getStatus() != CourseStatus.DRAFT && course.getStatus() != CourseStatus.CANCELLED) {
+            throw new RuntimeException("Only DRAFT or CANCELLED courses can be deleted.");
+        }
+        courseRepository.delete(course);
+    }
+
+    @Transactional
     public CourseResponse approveCourse(Long id) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found"));

@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/materials/*/download").hasAnyAuthority("PROFESOR", "FORMATOR", "ADMIN")
                         .requestMatchers("/api/materials/**").hasAnyAuthority("FORMATOR", "ADMIN")
                         .requestMatchers("/api/schools/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/users/forgot-password").permitAll()
                         .requestMatchers("/api/users/me").authenticated()
                         .requestMatchers("/api/users/**").hasAuthority("ADMIN")
                         .requestMatchers("/api/courses/**").hasAnyAuthority("ADMIN", "FORMATOR")

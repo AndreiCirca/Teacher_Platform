@@ -1,12 +1,16 @@
 package com.example.TeacherPlatform.service;
 
+import com.example.TeacherPlatform.dataTransferObject.PasswordResetRequestResponse;
 import com.example.TeacherPlatform.dataTransferObject.UserRequest;
 import com.example.TeacherPlatform.dataTransferObject.UserResponse;
 import com.example.TeacherPlatform.exception.ResourceNotFoundException;
+import com.example.TeacherPlatform.model.PasswordResetRequest;
 import com.example.TeacherPlatform.model.School;
 import com.example.TeacherPlatform.model.User;
+import com.example.TeacherPlatform.model.enums.ResetRequestStatus;
 import com.example.TeacherPlatform.model.enums.UserRole;
 import com.example.TeacherPlatform.repository.BaseRepository;
+import com.example.TeacherPlatform.repository.PasswordResetRequestRepository;
 import com.example.TeacherPlatform.repository.SchoolRepository;
 import com.example.TeacherPlatform.repository.UserRepository;
 import com.example.TeacherPlatform.service.generic.GenericService;
@@ -16,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +31,7 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
     private final UserRepository userRepository;
     private final SchoolRepository schoolRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordResetRequestRepository resetRequestRepository;
 
     @Override
     protected BaseRepository<User> getRepository() {
@@ -70,6 +76,72 @@ public class UserService extends GenericService<User, UserRequest, UserResponse>
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new RuntimeException("Parola curentă este incorectă.");
         }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void createResetRequest(String email) {
+        String emailClean = email.trim().toLowerCase();
+        // Prevent duplicate pending requests for the same email
+        if (resetRequestRepository.existsByEmailAndStatus(emailClean, ResetRequestStatus.PENDING)) {
+            return; // silently ignore — don't reveal whether account exists
+        }
+        // Also silently ignore if email doesn't exist in system (don't leak account info)
+        if (userRepository.findByEmail(emailClean).isEmpty()) {
+            return;
+        }
+        PasswordResetRequest req = new PasswordResetRequest();
+        req.setEmail(emailClean);
+        req.setStatus(ResetRequestStatus.PENDING);
+        resetRequestRepository.save(req);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PasswordResetRequestResponse> getPendingResetRequests() {
+        return resetRequestRepository
+                .findByStatusOrderByRequestedAtDesc(ResetRequestStatus.PENDING)
+                .stream()
+                .map(this::toResetResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void resolveResetRequest(Long requestId, String newPassword) {
+        PasswordResetRequest req = resetRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cererea nu a fost găsită"));
+        if (req.getStatus() == ResetRequestStatus.RESOLVED) {
+            throw new RuntimeException("Cererea a fost deja rezolvată.");
+        }
+        // Reset the password
+        resetPassword(userRepository.findByEmail(req.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Utilizatorul nu mai există"))
+                .getId(), newPassword);
+        // Mark as resolved
+        req.setStatus(ResetRequestStatus.RESOLVED);
+        req.setResolvedAt(LocalDateTime.now());
+        resetRequestRepository.save(req);
+    }
+
+    private PasswordResetRequestResponse toResetResponse(PasswordResetRequest req) {
+        PasswordResetRequestResponse r = new PasswordResetRequestResponse();
+        r.setId(req.getId());
+        r.setEmail(req.getEmail());
+        r.setStatus(req.getStatus());
+        r.setRequestedAt(req.getRequestedAt());
+        r.setResolvedAt(req.getResolvedAt());
+        userRepository.findByEmail(req.getEmail())
+                .ifPresent(u -> r.setUserFullName(u.getFirstName() + " " + u.getLastName()));
+        return r;
+    }
+
+    @Transactional
+    public void resetPassword(Long id, String newPassword) {
+        if (newPassword == null || newPassword.isBlank() || newPassword.length() < 6) {
+            throw new RuntimeException("Parola trebuie să aibă cel puțin 6 caractere.");
+        }
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilizatorul nu a fost găsit"));
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }

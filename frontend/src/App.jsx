@@ -10,6 +10,11 @@ import MyCourses from '../pages/trainer/MyCourses'
 import Participants from '../pages/trainer/Participants'
 import AttendanceCatalog from '../pages/trainer/AttendanceCatalog'
 import ProposeCourse from '../pages/trainer/ProposeCourse'
+import AdminDashboard from '../pages/admin/AdminDashboard'
+import CourseApprovals from '../pages/admin/CourseApprovals'
+import AllStudents from '../pages/admin/AllStudents'
+import AllUsers from '../pages/admin/AllUsers'
+import Schools from '../pages/admin/Schools'
 
 export default function App() {
     return (
@@ -30,6 +35,13 @@ export default function App() {
             <Route path="/trainer/participants" element={<Participants />} />
             <Route path="/trainer/attendance" element={<AttendanceCatalog />} />
             <Route path="/trainer/propose" element={<ProposeCourse />} />
+
+            {/* Admin routes */}
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/approvals" element={<CourseApprovals />} />
+            <Route path="/admin/students" element={<AllStudents />} />
+            <Route path="/admin/users" element={<AllUsers />} />
+            <Route path="/admin/schools" element={<Schools />} />
         </Routes>
     )
 }
